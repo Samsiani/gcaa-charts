@@ -39,12 +39,22 @@
             return val;
         }
 
+        // Handle percentage display for formula columns
+        if (col.type === 'formula' && col.props && col.props.isPercent) {
+            num = num * 100;
+        }
+
         if (col.props && col.props.precision) {
             num = num.toFixed(col.props.precision);
         }
 
         var prefix = (col.props && col.props.prefix) ? col.props.prefix : '';
         var suffix = (col.props && col.props.suffix) ? col.props.suffix : '';
+
+        // Append % suffix for percentage formula columns
+        if (col.type === 'formula' && col.props && col.props.isPercent) {
+            suffix = suffix + '%';
+        }
 
         return prefix + num + suffix;
     }
@@ -132,6 +142,21 @@
                 scales: settings.chartType === 'pie' ? {} : {
                     x: { stacked: settings.stacked || false },
                     y: { stacked: settings.stacked || false, beginAtZero: true }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                var val = context.raw;
+                                if (settings.mode === 'percent' && settings.chartType === 'pie') {
+                                    var sum = context.chart._metasets[context.datasetIndex].total;
+                                    var p = ((val / sum) * 100).toFixed(1) + '%';
+                                    return context.label + ': ' + p;
+                                }
+                                return context.label + ': ' + val;
+                            }
+                        }
+                    }
                 }
             }
         });

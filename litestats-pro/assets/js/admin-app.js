@@ -188,6 +188,7 @@
             $('#colPrefix').on('change', function() { self.updateColMeta('prefix', this.value); });
             $('#colSuffix').on('change', function() { self.updateColMeta('suffix', this.value); });
             $('#colPrecision').on('change', function() { self.updateColMeta('precision', this.value); });
+            $('#colIsPercent').on('change', function() { self.updateColMeta('isPercent', this.checked); });
 
             // Formula input
             $('#formulaInput').on('change', function() {
@@ -233,6 +234,7 @@
                     onDelCol: function(idx) { self.delCol(idx); },
                     onDelRow: function(idx) { self.delRow(idx); },
                     onCellChange: function(rIdx, cIdx, val) { self.updateCell(rIdx, cIdx, val); },
+                    onColumnTypeChange: function(idx, newType) { self.updateColumnType(idx, newType); },
                     onReorder: function() { self.renderGrid(); },
                     onRenderComplete: function() {
                         self.updateStatus();
@@ -269,6 +271,14 @@
             $('#colPrefix').val(col.props.prefix || '');
             $('#colSuffix').val(col.props.suffix || '');
             $('#colPrecision').val(col.props.precision !== undefined ? col.props.precision : 0);
+
+            // Show/hide percentage option for formula columns
+            if (col.type === 'formula') {
+                $('#formulaPercentOption').show();
+                $('#colIsPercent').prop('checked', col.props.isPercent || false);
+            } else {
+                $('#formulaPercentOption').hide();
+            }
 
             // Update Formula Bar
             var fInput = $('#formulaInput');
@@ -378,6 +388,29 @@
         updateHeader: function(cIdx, val) {
             this.app.cols[cIdx].name = val;
             this.updateChartRender();
+        },
+
+        /**
+         * Update column type.
+         *
+         * @param {number} colIdx - The column index.
+         * @param {string} newType - The new column type ('string' or 'number').
+         */
+        updateColumnType: function(colIdx, newType) {
+            if (colIdx < 0 || colIdx >= this.app.cols.length) {
+                return;
+            }
+            
+            var col = this.app.cols[colIdx];
+            
+            // Do not allow changing formula columns
+            if (col.type === 'formula') {
+                return;
+            }
+            
+            this.saveState();
+            col.type = newType;
+            this.renderGrid();
         },
 
         /**

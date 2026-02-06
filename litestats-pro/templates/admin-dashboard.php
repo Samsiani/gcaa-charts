@@ -191,6 +191,12 @@ $page_title  = $is_new ? __( 'Add New Chart', 'litestats-pro' ) : __( 'Edit Char
                         <option value="2">1.00</option>
                     </select>
                 </div>
+                <div class="formula-percent-option" id="formulaPercentOption" style="display:none; margin-top:10px;">
+                    <label>
+                        <input type="checkbox" id="colIsPercent">
+                        <?php esc_html_e( 'Show as Percentage (%)', 'litestats-pro' ); ?>
+                    </label>
+                </div>
                 <small class="format-hint">
                     <?php esc_html_e( 'Select a column header to apply formats.', 'litestats-pro' ); ?>
                 </small>

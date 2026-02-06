@@ -40,6 +40,11 @@
                 return val;
             }
 
+            // Handle percentage display for formula columns
+            if (col.type === 'formula' && col.props && col.props.isPercent) {
+                num = num * 100;
+            }
+
             // Precision
             if (col.props && col.props.precision) {
                 num = num.toFixed(col.props.precision);
@@ -48,6 +53,11 @@
             // Prefix/Suffix
             var prefix = (col.props && col.props.prefix) ? col.props.prefix : '';
             var suffix = (col.props && col.props.suffix) ? col.props.suffix : '';
+
+            // Append % suffix for percentage formula columns
+            if (col.type === 'formula' && col.props && col.props.isPercent) {
+                suffix = suffix + '%';
+            }
 
             return prefix + num + suffix;
         },
@@ -74,13 +84,23 @@
             
             app.cols.forEach(function(col, idx) {
                 var isSelected = app.selectedCol === idx ? 'color:var(--litestats-primary)' : '';
-                var typeLabel = col.type === 'formula' ? 'ƒ(x)' : (col.type === 'number' ? '123' : 'ABC');
+                var typeLabel;
+                
+                // For formula columns, show static label; for others, show select dropdown
+                if (col.type === 'formula') {
+                    typeLabel = '<span class="col-type-label">ƒ(x)</span>';
+                } else {
+                    typeLabel = '<select class="col-type-select" data-col-idx="' + idx + '">' +
+                        '<option value="string"' + (col.type === 'string' ? ' selected' : '') + '>ABC</option>' +
+                        '<option value="number"' + (col.type === 'number' ? ' selected' : '') + '>123</option>' +
+                    '</select>';
+                }
                 
                 hHtml += '<th>' +
                     '<div class="th-inner" data-col-idx="' + idx + '">' +
                         '<div class="th-top">' +
                             '<span class="col-move-left" data-idx="' + idx + '">◀</span>' +
-                            '<span>' + typeLabel + '</span>' +
+                            typeLabel +
                             '<span class="col-delete" data-idx="' + idx + '">✕</span>' +
                         '</div>' +
                         '<input class="th-title" id="th-title-' + idx + '" value="' + self.escapeHtml(col.name) + '" ' +
@@ -200,6 +220,22 @@
                     if (typeof options.onDelCol === 'function') {
                         options.onDelCol(idx);
                     }
+                });
+            });
+
+            // Column type change
+            document.querySelectorAll('.col-type-select').forEach(function(el) {
+                el.addEventListener('change', function(e) {
+                    e.stopPropagation();
+                    var idx = parseInt(this.dataset.colIdx, 10);
+                    var newType = this.value;
+                    if (typeof options.onColumnTypeChange === 'function') {
+                        options.onColumnTypeChange(idx, newType);
+                    }
+                });
+                // Prevent click from propagating to th-inner
+                el.addEventListener('click', function(e) {
+                    e.stopPropagation();
                 });
             });
 
