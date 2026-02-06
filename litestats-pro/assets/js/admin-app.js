@@ -551,6 +551,18 @@
                 this.chart.destroy();
             }
 
+            // SAFETY CHECK: Ensure Chart library is loaded
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js library not loaded. Skipping chart render.');
+                // Optionally display a warning in the UI
+                if (ctx) {
+                    ctx.font = '14px Arial';
+                    ctx.fillStyle = 'red';
+                    ctx.fillText('Chart library missing', 10, 50);
+                }
+                return;
+            }
+
             // Create new chart
             this.chart = new Chart(ctx, {
                 type: this.app.settings.chartType === 'combo' ? 'bar' : this.app.settings.chartType,
