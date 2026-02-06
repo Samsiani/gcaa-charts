@@ -98,7 +98,7 @@ class Activator {
                 'show_ui'      => false,
                 'show_in_menu' => false,
                 'show_in_rest' => false,
-                'supports'     => [ 'title', 'editor', 'custom-fields' ],
+                'supports'     => [ 'title' ],
                 'rewrite'      => false,
                 'query_var'    => false,
             ]

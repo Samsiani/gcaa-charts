@@ -114,10 +114,11 @@ class Ajax {
         $settings = [];
 
         if ( isset( $_POST['config'] ) ) {
-            $config_json = sanitize_text_field( wp_unslash( $_POST['config'] ) );
+            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON requires raw data, sanitized after decode
+            $config_json = wp_unslash( $_POST['config'] );
             $config      = json_decode( $config_json, true );
 
-            if ( json_last_error() !== JSON_ERROR_NONE ) {
+            if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $config ) ) {
                 wp_send_json_error(
                     [
                         'message' => __( 'Invalid configuration data.', 'litestats-pro' ),
@@ -130,10 +131,11 @@ class Ajax {
         }
 
         if ( isset( $_POST['settings'] ) ) {
-            $settings_json = sanitize_text_field( wp_unslash( $_POST['settings'] ) );
+            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON requires raw data, sanitized after decode
+            $settings_json = wp_unslash( $_POST['settings'] );
             $settings      = json_decode( $settings_json, true );
 
-            if ( json_last_error() !== JSON_ERROR_NONE ) {
+            if ( json_last_error() !== JSON_ERROR_NONE || ! is_array( $settings ) ) {
                 wp_send_json_error(
                     [
                         'message' => __( 'Invalid settings data.', 'litestats-pro' ),

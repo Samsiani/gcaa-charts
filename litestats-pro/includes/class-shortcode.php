@@ -57,6 +57,31 @@ class Shortcode {
      */
     private function init_hooks(): void {
         add_shortcode( 'litestats', [ $this, 'render_shortcode' ] );
+        add_filter( 'script_loader_tag', [ $this, 'add_script_integrity' ], 10, 3 );
+    }
+
+    /**
+     * Add SRI integrity attribute to CDN scripts.
+     *
+     * @since 5.0.0
+     *
+     * @param string $tag    The script tag HTML.
+     * @param string $handle The script handle.
+     * @param string $src    The script source URL.
+     * @return string Modified script tag.
+     */
+    public function add_script_integrity( string $tag, string $handle, string $src ): string {
+        // Add integrity for Chart.js CDN.
+        if ( 'chartjs' === $handle && strpos( $src, 'cdn.jsdelivr.net' ) !== false ) {
+            // SRI hash for Chart.js 4.4.1.
+            $integrity = 'sha384-UBBogULO3yLoxBu3mcRpFHGrPU/tVV0VaJiEeYQ+ZiMvSKqJMLtQgkBuxkGMTjwS';
+            $tag = str_replace(
+                ' src=',
+                ' integrity="' . $integrity . '" crossorigin="anonymous" src=',
+                $tag
+            );
+        }
+        return $tag;
     }
 
     /**
