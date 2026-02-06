@@ -611,13 +611,30 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    var val = context.raw;
-                                    if (self.app.settings.mode === 'percent' && self.app.settings.chartType === 'pie') {
-                                        var sum = context.chart._metasets[context.datasetIndex].total;
-                                        var p = ((val / sum) * 100).toFixed(1) + '%';
-                                        return context.label + ': ' + p;
+                                    var label = context.label || '';
+                                    var value = context.raw;
+
+                                    // Specific logic for Pie/Donut charts
+                                    if (context.chart.config.type === 'pie' || context.chart.config.type === 'doughnut') {
+                                        var dataset = context.dataset;
+                                        var meta = context.chart.getDatasetMeta(context.datasetIndex);
+                                        var total = meta.total;
+
+                                        // Manual calculation fallback
+                                        if (!total) {
+                                            total = dataset.data.reduce(function(acc, val) {
+                                                return acc + (parseFloat(val) || 0);
+                                            }, 0);
+                                        }
+
+                                        var percentage = parseFloat((value / total * 100).toFixed(1));
+
+                                        // Only return Value and Percent. Label is already in the Header.
+                                        return value + ' (' + percentage + '%)';
                                     }
-                                    return context.label + ': ' + val;
+
+                                    // Default behavior for other charts
+                                    return label + ': ' + value;
                                 }
                             }
                         }
