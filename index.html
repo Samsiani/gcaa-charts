@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <title>LiteStats Pro - v5.0 Math Engine</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary: #2271b1; 
+            --primary-dark: #135e96; 
+            --primary-light: #f0f6fc;
+            --accent: #007cba;
+            --bg: #f0f2f5; 
+            --surface: #ffffff;
+            --border: #dcdcde; 
+            --text: #1d2327; 
+            --text-light: #646970;
+            --danger: #d63638; 
+            --success: #00a32a; 
+            --warning: #dba617;
+            --formula-bg: #f9f9f9;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg); margin: 0; display: flex; flex-direction: column;
+            height: 100vh; color: var(--text); overflow: hidden; font-size: 13px;
+        }
+
+        /* --- UI Elements --- */
+        .btn {
+            padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border);
+            background: var(--surface); cursor: pointer; font-weight: 500; font-size: 13px;
+            color: var(--text); display: inline-flex; align-items: center; gap: 6px;
+            transition: all 0.2s; user-select: none;
+        }
+        .btn:hover { border-color: var(--primary); color: var(--primary); }
+        .btn:active { transform: translateY(1px); }
+        
+        .btn-primary { background: var(--primary); color: white; border-color: var(--primary); }
+        .btn-primary:hover { background: var(--primary-dark); color: white; }
+        
+        .btn-icon { padding: 8px; justify-content: center; }
+        .btn-sm { padding: 4px 8px; font-size: 11px; }
+
+        .divider { width: 1px; height: 20px; background: var(--border); margin: 0 8px; }
+
+        .toggle-group { display: flex; background: #eee; border-radius: 4px; padding: 2px; }
+        .t-btn { 
+            border: none; padding: 4px 10px; font-size: 11px; font-weight: 600; border-radius: 3px; 
+            cursor: pointer; background: transparent; color: var(--text-light); transition: 0.2s; 
+        }
+        .t-btn.active { background: white; color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+        /* --- Layout --- */
+        .top-bar {
+            background: var(--surface); padding: 10px 20px; border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center; z-index: 100;
+        }
+        .brand { font-size: 18px; font-weight: 800; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        .sc-badge { 
+            background: var(--primary-light); border: 1px solid #cce5ff; color: var(--primary-dark);
+            padding: 4px 10px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 12px; 
+        }
+
+        .main-container { display: flex; flex: 1; overflow: hidden; }
+
+        /* --- Left Editor --- */
+        .editor-panel {
+            flex: 1.8; display: flex; flex-direction: column; background: var(--surface);
+            border-right: 1px solid var(--border); overflow: hidden;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            padding: 8px 15px; background: #fff; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; flex-wrap: wrap; gap: 5px;
+        }
+
+        /* Formula Bar */
+        .formula-bar-wrapper {
+            display: flex; align-items: center; padding: 5px 10px; background: var(--formula-bg);
+            border-bottom: 1px solid var(--border); gap: 10px;
+        }
+        .fx-icon { font-style: italic; font-weight: bold; color: #999; font-family: serif; font-size: 16px; }
+        .formula-input {
+            flex: 1; border: 1px solid var(--border); padding: 6px 10px; font-family: 'Consolas', monospace;
+            font-size: 13px; border-radius: 3px; outline: none;
+        }
+        .formula-input:focus { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+
+        /* Table Grid */
+        .grid-container { flex: 1; overflow: auto; position: relative; background: #fff; }
+        table.grid { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 800px; }
+        
+        .grid th {
+            position: sticky; top: 0; background: #f8f9fa; border-bottom: 1px solid #bbb; border-right: 1px solid #ddd;
+            padding: 0; z-index: 10; user-select: none;
+        }
+        .th-inner { padding: 8px; display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
+        .th-top { display: flex; justify-content: space-between; font-size: 10px; color: #888; }
+        .th-title {
+            width: 100%; border: none; background: transparent; font-weight: 700; text-align: center;
+            font-size: 12px; outline: none; padding: 2px;
+        }
+        .th-title:focus { background: white; box-shadow: 0 0 0 1px var(--primary); border-radius: 2px; }
+
+        .grid td { border-bottom: 1px solid #eee; border-right: 1px solid #eee; padding: 0; position: relative; }
+        .grid tr:hover { background: #fdfdfd; }
+        
+        .cell-input {
+            width: 100%; border: none; padding: 8px; font-size: 13px; text-align: center;
+            outline: none; background: transparent; color: var(--text);
+        }
+        .cell-input:focus { background: #eef7ff; box-shadow: inset 0 0 0 2px var(--primary); }
+        .cell-calculated { color: var(--primary); font-weight: 600; background: #f9fcff; }
+        .cell-html { font-family: monospace; color: #d63638; }
+
+        /* Drag Handles */
+        .row-handle {
+            width: 35px; background: #f4f4f4; border-right: 1px solid #ccc; border-bottom: 1px solid #ccc;
+            text-align: center; cursor: grab; position: relative; vertical-align: middle;
+        }
+        .row-handle:hover { background: #e0e0e0; }
+        .row-handle i { color: #bbb; font-size: 12px; }
+        .del-row {
+            position: absolute; left: 2px; top: 50%; transform: translateY(-50%);
+            color: var(--danger); opacity: 0; cursor: pointer; padding: 4px;
+        }
+        .row-handle:hover .del-row { opacity: 1; }
+
+        /* Status Bar */
+        .status-bar {
+            padding: 5px 15px; background: #f8f9fa; border-top: 1px solid var(--border);
+            font-size: 11px; color: var(--text-light); display: flex; justify-content: space-between;
+        }
+
+        /* --- Right Preview --- */
+        .preview-panel {
+            flex: 1.4; background: #f8f9fa; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 20px;
+        }
+
+        .card {
+            background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+            padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+        }
+
+        .chart-wrapper { position: relative; height: 320px; width: 100%; }
+        
+        /* Frontend Table Preview */
+        .wp-table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        .wp-table th { background: #f1f3f4; padding: 10px; text-align: left; border-bottom: 2px solid #ddd; cursor: pointer; }
+        .wp-table td { padding: 8px; border-bottom: 1px solid #eee; }
+        .wp-table tr:last-child td { border-bottom: none; }
+        .search-box { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 10px; }
+
+        /* Toast */
+        .toast {
+            position: fixed; bottom: 20px; right: 20px; background: #333; color: white;
+            padding: 10px 20px; border-radius: 4px; font-size: 13px; opacity: 0;
+            transform: translateY(20px); transition: 0.3s; z-index: 9999;
+        }
+        .toast.visible { opacity: 1; transform: translateY(0); }
+
+        /* Modals / Overlays can be added here if needed */
+        .formula-help { font-size: 10px; color: #888; margin-left: auto; }
+    </style>
+</head>
+<body>
+
+<div class="top-bar">
+    <div class="brand"><i class="fas fa-cube"></i> LiteStats <span>PRO v5</span></div>
+    <div class="sc-badge" id="scCode">[litestats id="50"]</div>
+    <div>
+        <button class="btn btn-primary" onclick="saveAll()"><i class="fas fa-save"></i> Save</button>
+    </div>
+</div>
+
+<div class="main-container">
+    
+    <div class="editor-panel">
+        
+        <div class="toolbar">
+            <button class="btn btn-sm" onclick="undo()" title="Undo"><i class="fas fa-undo"></i></button>
+            <button class="btn btn-sm" onclick="redo()" title="Redo"><i class="fas fa-redo"></i></button>
+            <div class="divider"></div>
+            
+            <button class="btn btn-sm" onclick="transposeTable()"><i class="fas fa-retweet"></i> Transpose</button>
+            <button class="btn btn-sm" onclick="triggerImport()"><i class="fas fa-file-import"></i> CSV</button>
+            <button class="btn btn-sm" onclick="saveTemplate()"><i class="fas fa-bookmark"></i> Preset</button>
+            <div class="divider"></div>
+
+            <button class="btn btn-sm" onclick="addRow()"><i class="fas fa-plus"></i> Row</button>
+            <button class="btn btn-sm" onclick="addCol()"><i class="fas fa-plus"></i> Col</button>
+            <button class="btn btn-sm" onclick="addFormulaCol()" style="color:var(--primary)"><i class="fas fa-function"></i> Formula</button>
+            
+            <div class="divider"></div>
+            <div class="toggle-group">
+                <button class="t-btn active" id="modeValue" onclick="setMode('value')">123</button>
+                <button class="t-btn" id="modePercent" onclick="setMode('percent')">%</button>
+            </div>
+        </div>
+
+        <div class="formula-bar-wrapper">
+            <span class="fx-icon">fx</span>
+            <input type="text" class="formula-input" id="formulaInput" placeholder="Select a column header to edit formula..." disabled>
+            <div class="formula-help">Supported: SUM, AVG, MIN, MAX, IF, CONCAT</div>
+        </div>
+
+        <div class="grid-container">
+            <table class="grid" id="mainGrid">
+                <thead id="gridHead"></thead>
+                <tbody id="gridBody"></tbody>
+            </table>
+        </div>
+
+        <div class="status-bar" id="statusBar">Ready</div>
+        
+        <input type="file" id="csvInput" hidden accept=".csv">
+    </div>
+
+    <div class="preview-panel">
+        
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
+                <strong>Visualization</strong>
+                <div class="toggle-group">
+                    <button class="t-btn active" id="viewChart" onclick="setView('chart')">Chart</button>
+                    <button class="t-btn" id="viewTable" onclick="setView('table')">Table</button>
+                </div>
+            </div>
+
+            <div class="chart-wrapper">
+                <canvas id="liveChart"></canvas>
+                
+                <div id="tablePreviewBox" style="display:none; height:100%; overflow:auto;">
+                    <input type="text" class="search-box" id="feSearch" placeholder="Search data..." onkeyup="filterFrontendTable()">
+                    <table class="wp-table" id="feTable">
+                        <thead id="feThead"></thead>
+                        <tbody id="feTbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="margin-top:15px; display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px;">
+                <select class="btn" style="width:100%" id="chartType" onchange="updateChartRender()">
+                    <option value="bar">Bar Chart</option>
+                    <option value="line">Line Chart</option>
+                    <option value="pie">Pie Chart</option>
+                    <option value="radar">Radar Chart</option>
+                    <option value="combo">Combo (Dual)</option>
+                </select>
+                <select class="btn" style="width:100%" id="themeSelect" onchange="updateChartRender()">
+                    <option value="default">WP Default</option>
+                    <option value="modern">Modern</option>
+                    <option value="pastel">Pastel</option>
+                    <option value="dark">Dark Mode</option>
+                </select>
+                <button class="btn" style="width:100%; justify-content:center" onclick="toggleStack()">
+                    <i class="fas fa-layer-group"></i> Stack
+                </button>
+            </div>
+            <div style="margin-top:10px; display:flex; gap:10px; justify-content:flex-end;">
+                 <button class="btn btn-sm" onclick="exportImg()"><i class="fas fa-download"></i> PNG</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <strong>Column Formatting</strong>
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:10px;">
+                <input class="btn" placeholder="Prefix ($)" id="colPrefix" onchange="updateColMeta('prefix', this.value)">
+                <input class="btn" placeholder="Suffix (kg)" id="colSuffix" onchange="updateColMeta('suffix', this.value)">
+                <select class="btn" id="colPrecision" onchange="updateColMeta('precision', this.value)">
+                    <option value="0">1</option>
+                    <option value="1">1.0</option>
+                    <option value="2">1.00</option>
+                </select>
+            </div>
+            <small style="color:#888; margin-top:5px; display:block;">Select a column header to apply formats.</small>
+        </div>
+
+    </div>
+</div>
+
+<div class="toast" id="toast">Message</div>
+<script>
+    // --- PART 2: CORE LOGIC & MATH ENGINE ---
+
+    // Initial State
+    let app = {
+        cols: [
+            { id: 'c1', name: 'Product', type: 'string', width: 150, props: {} },
+            { id: 'c2', name: '2023 Sales', type: 'number', width: 100, props: { prefix: '$' } },
+            { id: 'c3', name: '2024 Sales', type: 'number', width: 100, props: { prefix: '$' } },
+            { id: 'c4', name: 'Growth', type: 'formula', formula: '=IF({c3}>{c2}, "UP", "DOWN")', width: 100, props: {} }
+        ],
+        rows: [
+            ['Laptop', 1200, 1500, ''],
+            ['Phone', 800, 750, ''],
+            ['Tablet', 450, 600, '']
+        ],
+        settings: {
+            chartType: 'bar',
+            theme: 'default',
+            stacked: false,
+            view: 'chart',
+            mode: 'value' // value | percent
+        },
+        selectedCol: null
+    };
+
+    let undoStack = [];
+    let redoStack = [];
+    const MAX_HISTORY = 30;
+
+    // --- HISTORY SYSTEM (Undo/Redo) ---
+    function saveState() {
+        if (undoStack.length >= MAX_HISTORY) undoStack.shift();
+        undoStack.push(JSON.stringify({ cols: app.cols, rows: app.rows }));
+        redoStack = []; // Clear redo on new action
+        updateStatus();
+    }
+
+    function undo() {
+        if (undoStack.length === 0) return;
+        redoStack.push(JSON.stringify({ cols: app.cols, rows: app.rows }));
+        const prev = JSON.parse(undoStack.pop());
+        app.cols = prev.cols;
+        app.rows = prev.rows;
+        renderGrid();
+        showToast("Undo successful");
+    }
+
+    function redo() {
+        if (redoStack.length === 0) return;
+        saveState(); // Push current to undo
+        undoStack.pop(); // Fix double push
+        const next = JSON.parse(redoStack.pop());
+        app.cols = next.cols;
+        app.rows = next.rows;
+        renderGrid();
+        showToast("Redo successful");
+    }
+
+    // --- MATH ENGINE ---
+    const MathEngine = {
+        evaluate: (formula, row, cols) => {
+            if (!formula || !formula.startsWith('=')) return formula;
+            
+            let expression = formula.substring(1); // Remove '='
+            
+            // 1. Replace Column IDs {c1} with actual values
+            cols.forEach((col, idx) => {
+                const val = parseFloat(row[idx]) || 0;
+                // Regex to replace {id} globally
+                const regex = new RegExp(`{${col.id}}`, 'g');
+                expression = expression.replace(regex, val);
+            });
+
+            // 2. Handle Functions
+            try {
+                // SUM(v1, v2) -> v1+v2 (Simplified for logic)
+                // In a real parser we would tokenize. Here we use JS eval safely for simple math
+                
+                // Polyfills for Excel functions inside eval scope
+                const SUM = (...args) => args.reduce((a, b) => a + b, 0);
+                const AVG = (...args) => args.reduce((a, b) => a + b, 0) / args.length;
+                const MAX = (...args) => Math.max(...args);
+                const MIN = (...args) => Math.min(...args);
+                const IF = (cond, t, f) => cond ? t : f;
+                const CONCAT = (...args) => args.join('');
+
+                // Dangerous but effective for this demo level (Sandbox in prod!)
+                // replacing " with ' to avoid breaking HTML attributes if needed
+                return eval(expression); 
+            } catch (e) {
+                return "#ERR";
+            }
+        },
+
+        recalcAll: () => {
+            app.cols.forEach((col, cIdx) => {
+                if (col.type === 'formula') {
+                    app.rows.forEach(row => {
+                        row[cIdx] = MathEngine.evaluate(col.formula, row, app.cols);
+                    });
+                }
+            });
+        }
+    };
+
+    // --- CRUD OPERATIONS ---
+    function addRow() {
+        saveState();
+        const newRow = app.cols.map(c => c.type === 'number' ? 0 : '');
+        app.rows.push(newRow);
+        MathEngine.recalcAll();
+        renderGrid();
+    }
+
+    function addCol() {
+        saveState();
+        const newId = 'c' + Date.now();
+        app.cols.push({ id: newId, name: 'New', type: 'number', width: 100, props: {} });
+        app.rows.forEach(r => r.push(0));
+        renderGrid();
+    }
+
+    function addFormulaCol() {
+        saveState();
+        const newId = 'c' + Date.now();
+        app.cols.push({ id: newId, name: 'Calc', type: 'formula', formula: '=0', width: 100, props: {} });
+        app.rows.forEach(r => r.push(0));
+        renderGrid();
+    }
+
+    function delRow(idx) {
+        saveState();
+        app.rows.splice(idx, 1);
+        renderGrid();
+    }
+
+    function delCol(idx) {
+        if(app.cols.length <= 1) return showToast("Cannot delete last column", false);
+        saveState();
+        app.cols.splice(idx, 1);
+        app.rows.forEach(r => r.splice(idx, 1));
+        renderGrid();
+    }
+
+    function updateCell(rIdx, cIdx, val) {
+        // No saveState on every keystroke, use 'change' or debounce in prod
+        // For now, we update direct state
+        app.rows[rIdx][cIdx] = val;
+        MathEngine.recalcAll();
+        // We re-render chart, but maybe not entire grid to keep focus
+        updateChartRender(); 
+    }
+
+    function updateHeader(cIdx, val) {
+        app.cols[cIdx].name = val;
+        updateChartRender();
+    }
+
+    // --- ADVANCED FEATURES ---
+    function transposeTable() {
+        saveState();
+        // 1. Get current headers as first column of new data
+        let newRows = [];
+        let newCols = [{ id: 'c_t_0', name: app.cols[0].name, type: 'string', props: {} }];
+
+        // The old rows become the new headers (Columns)
+        app.rows.forEach((row, i) => {
+            newCols.push({ 
+                id: 'c_t_' + (i+1), 
+                name: row[0] || ('Row '+i), 
+                type: 'number', 
+                props: {} 
+            });
+        });
+
+        // The old columns (starting from 1) become rows
+        for (let c = 1; c < app.cols.length; c++) {
+            let newRow = [app.cols[c].name];
+            app.rows.forEach(r => newRow.push(r[c]));
+            newRows.push(newRow);
+        }
+
+        app.cols = newCols;
+        app.rows = newRows;
+        renderGrid();
+        showToast("Table Transposed");
+    }
+
+    // --- FORMATTING ---
+    function selectColumn(idx) {
+        app.selectedCol = idx;
+        const col = app.cols[idx];
+        
+        // Highlight logic
+        document.querySelectorAll('.th-title').forEach(el => el.style.color = 'inherit');
+        document.getElementById(`th-title-${idx}`).style.color = 'var(--primary)';
+
+        // Update Settings Panel
+        document.getElementById('colPrefix').value = col.props.prefix || '';
+        document.getElementById('colSuffix').value = col.props.suffix || '';
+        document.getElementById('colPrecision').value = col.props.precision !== undefined ? col.props.precision : 0;
+
+        // Update Formula Bar
+        const fInput = document.getElementById('formulaInput');
+        if (col.type === 'formula') {
+            fInput.value = col.formula;
+            fInput.disabled = false;
+            fInput.focus();
+        } else {
+            fInput.value = `Column ID: {${col.id}}`;
+            fInput.disabled = true;
+        }
+    }
+
+    function updateColMeta(key, val) {
+        if (app.selectedCol === null) return showToast("Select a column first", false);
+        saveState();
+        app.cols[app.selectedCol].props[key] = val;
+        renderGrid();
+    }
+
+    // Formula Input Handler
+    document.getElementById('formulaInput').addEventListener('change', (e) => {
+        if (app.selectedCol !== null && app.cols[app.selectedCol].type === 'formula') {
+            saveState();
+            app.cols[app.selectedCol].formula = e.target.value;
+            MathEngine.recalcAll();
+            renderGrid();
+        }
+    });
+
+    // --- TEMPLATES ---
+    function saveTemplate() {
+        const name = prompt("Enter preset name:", "My Style 1");
+        if(name) {
+            const preset = { settings: app.settings, props: app.cols.map(c=>c.props) };
+            localStorage.setItem('litestats_preset_' + name, JSON.stringify(preset));
+            showToast("Preset Saved!");
+        }
+    }
+
+    // --- HELPER UTILS ---
+    function formatValue(val, col) {
+        if (col.type === 'string') return val;
+        let num = parseFloat(val);
+        if (isNaN(num)) return val;
+
+        // Precision
+        if (col.props.precision) num = num.toFixed(col.props.precision);
+        
+        // Prefix/Suffix
+        return (col.props.prefix || '') + num + (col.props.suffix || '');
+    }
+
+    function showToast(msg, success = true) {
+        const t = document.getElementById('toast');
+        t.innerText = msg;
+        t.style.background = success ? '#333' : 'var(--danger)';
+        t.classList.add('visible');
+        setTimeout(() => t.classList.remove('visible'), 3000);
+    }
+    
+    function updateStatus() {
+        document.getElementById('statusBar').innerText = 
+            `Rows: ${app.rows.length} | Cols: ${app.cols.length} | History: ${undoStack.length}`;
+    }
+
+    // CSV Import (Basic)
+    function triggerImport() { document.getElementById('csvInput').click(); }
+    document.getElementById('csvInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            saveState();
+            const lines = evt.target.result.split('\n').filter(l => l.trim());
+            const headers = lines[0].split(',');
+            
+            app.cols = headers.map((h, i) => ({
+                id: 'c'+Date.now()+i, 
+                name: h.trim(), 
+                type: i===0?'string':'number', 
+                props: {}
+            }));
+            
+            app.rows = lines.slice(1).map(l => l.split(',').map(v=>v.trim()));
+            renderGrid();
+            showToast("CSV Imported");
+        };
+        reader.readAsText(file);
+    });
+
+// --- PART 3: RENDERING & VISUALIZATION ---
+
+    function renderGrid() {
+        const thead = document.getElementById('gridHead');
+        const tbody = document.getElementById('gridBody');
+        
+        // 1. Render Headers
+        let hHtml = '<tr><th style="width:40px; background:#f0f0f0;"></th>'; // Corner
+        app.cols.forEach((col, idx) => {
+            const isSelected = app.selectedCol === idx ? 'color:var(--primary)' : '';
+            hHtml += `
+                <th>
+                    <div class="th-inner" onclick="selectColumn(${idx})">
+                        <div class="th-top">
+                            <span style="cursor:pointer" onclick="event.stopPropagation(); moveCol(${idx}, -1)">◀</span>
+                            <span>${col.type === 'formula' ? 'ƒ(x)' : (col.type==='number'?'123':'ABC')}</span>
+                            <span style="cursor:pointer" onclick="event.stopPropagation(); delCol(${idx})">✕</span>
+                        </div>
+                        <input class="th-title" id="th-title-${idx}" value="${col.name}" 
+                               style="${isSelected}"
+                               onchange="updateHeader(${idx}, this.value)">
+                    </div>
+                </th>
+            `;
+        });
+        hHtml += '</tr>';
+        thead.innerHTML = hHtml;
+
+        // 2. Render Rows
+        let bHtml = '';
+        app.rows.forEach((row, rIdx) => {
+            bHtml += `<tr>`;
+            
+            // Drag Handle Cell
+            bHtml += `
+                <td class="row-handle" draggable="true" 
+                    ondragstart="handleDragStart(event, ${rIdx})" 
+                    ondragover="event.preventDefault()" 
+                    ondrop="handleDrop(event, ${rIdx})">
+                    <i class="fas fa-grip-vertical"></i>
+                    <i class="fas fa-times del-row" onclick="delRow(${rIdx})"></i>
+                </td>
+            `;
+
+            // Data Cells
+            row.forEach((cell, cIdx) => {
+                const col = app.cols[cIdx];
+                const isFormula = col.type === 'formula';
+                
+                // If Formula, show calculation result, else show input value
+                // Note: We store the raw value/formula, but display formatted
+                const displayVal = isFormula ? cell : formatValue(cell, col);
+                
+                let cls = 'cell-input';
+                if (isFormula) cls += ' cell-calculated';
+                
+                // Conditional Formatting (Simple Check for Growth/%)
+                if (col.name.toLowerCase().includes('growth') || col.name.includes('%')) {
+                    const num = parseFloat(cell);
+                    if (num > 0) cls += ' val-pos';
+                    if (num < 0) cls += ' val-neg';
+                }
+
+                const readonly = isFormula ? 'readonly' : '';
+
+                bHtml += `
+                    <td>
+                        <input class="${cls}" value="${displayVal}" 
+                               ${readonly}
+                               onchange="updateCell(${rIdx}, ${cIdx}, this.value)">
+                    </td>
+                `;
+            });
+            bHtml += `</tr>`;
+        });
+        tbody.innerHTML = bHtml;
+
+        updateStatus();
+        updateChartRender();
+    }
+
+    // --- CHART RENDERING (Chart.js) ---
+    const themes = {
+        default: ['#2271b1', '#46b450', '#d63638', '#f1c40f', '#9b59b6'],
+        modern: ['#3f51b5', '#00bcd4', '#009688', '#ffc107', '#ff5722'],
+        pastel: ['#ffb7b2', '#ffdac1', '#e2f0cb', '#b5ead7', '#c7ceea'],
+        dark: ['#333333', '#555555', '#777777', '#999999', '#bbbbbb']
+    };
+
+    function updateChartRender() {
+        // Sync settings
+        app.settings.chartType = document.getElementById('chartType').value;
+        app.settings.theme = document.getElementById('themeSelect').value;
+        
+        // Frontend Table View check
+        if(app.settings.view === 'table') {
+            document.getElementById('liveChart').style.display = 'none';
+            document.getElementById('tablePreviewBox').style.display = 'block';
+            renderFrontendTable();
+            return;
+        } else {
+            document.getElementById('liveChart').style.display = 'block';
+            document.getElementById('tablePreviewBox').style.display = 'none';
+        }
+
+        const ctx = document.getElementById('liveChart').getContext('2d');
+        const palette = themes[app.settings.theme];
+        
+        // Data Prep
+        // Assuming Column 0 is always the Label (Category)
+        const labels = app.rows.map(r => r[0]);
+        const datasets = [];
+        
+        let colorIdx = 0;
+        // Loop cols starting from 1
+        for(let i=1; i<app.cols.length; i++) {
+            const col = app.cols[i];
+            // Determine type for combo chart
+            // For simple demo, we default to chartType, unless it's 'combo'
+            let type = app.settings.chartType;
+            if(type === 'combo') {
+                // If it's the last column, make it a line, else bar (Simple Logic)
+                type = (i === app.cols.length-1) ? 'line' : 'bar';
+            }
+            
+            // Pie chart logic (only takes 1st data column usually, or distinct datasets)
+            if(app.settings.chartType === 'pie' && i > 1) continue; 
+
+            datasets.push({
+                type: type === 'combo' ? 'bar' : type,
+                label: col.name,
+                data: app.rows.map(r => {
+                    let val = r[i];
+                    if(typeof val === 'string') val = val.replace(/[$,%]/g, ''); // cleanup formatting
+                    return parseFloat(val) || 0;
+                }),
+                backgroundColor: app.settings.chartType==='pie' ? palette : palette[colorIdx % palette.length],
+                borderColor: app.settings.chartType==='pie' ? '#fff' : palette[colorIdx % palette.length],
+                borderWidth: 2,
+                fill: type === 'line' && !app.settings.stacked, // only fill if line
+                tension: 0.4
+            });
+            colorIdx++;
+        }
+
+        if (window.myChart) window.myChart.destroy();
+
+        window.myChart = new Chart(ctx, {
+            type: app.settings.chartType === 'combo' ? 'bar' : app.settings.chartType,
+            data: { labels, datasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                scales: app.settings.chartType === 'pie' ? {} : {
+                    x: { stacked: app.settings.stacked },
+                    y: { stacked: app.settings.stacked, beginAtZero: true }
+                },
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: (ctx) => {
+                                let val = ctx.raw;
+                                if(app.settings.mode === 'percent' && app.settings.chartType === 'pie') {
+                                    // Simple percent calc
+                                    let sum = ctx.chart._metasets[ctx.datasetIndex].total;
+                                    let p = ((val / sum) * 100).toFixed(1) + '%';
+                                    return ctx.label + ': ' + p;
+                                }
+                                return ctx.label + ': ' + val;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // --- FRONTEND TABLE LOGIC ---
+    function renderFrontendTable() {
+        const thead = document.getElementById('feThead');
+        const tbody = document.getElementById('feTbody');
+        
+        let hHtml = '<tr>';
+        app.cols.forEach((c, i) => {
+            hHtml += `<th onclick="sortTable(${i})">${c.name} <i class="fas fa-sort" style="font-size:10px; color:#ccc"></i></th>`;
+        });
+        thead.innerHTML = hHtml + '</tr>';
+
+        let bHtml = '';
+        app.rows.forEach(r => {
+            bHtml += '<tr>';
+            r.forEach((cell, i) => {
+                const formatted = formatValue(cell, app.cols[i]);
+                bHtml += `<td>${formatted}</td>`;
+            });
+            bHtml += '</tr>';
+        });
+        tbody.innerHTML = bHtml;
+    }
+
+    function filterFrontendTable() {
+        const term = document.getElementById('feSearch').value.toLowerCase();
+        const rows = document.getElementById('feTbody').getElementsByTagName('tr');
+        for(let r of rows) {
+            const txt = r.innerText.toLowerCase();
+            r.style.display = txt.includes(term) ? '' : 'none';
+        }
+    }
+
+    function sortTable(n) {
+        // Simple sort implementation for preview
+        app.rows.sort((a, b) => {
+            let v1 = a[n], v2 = b[n];
+            if(app.cols[n].type === 'number') return parseFloat(v1) - parseFloat(v2);
+            return v1.toString().localeCompare(v2);
+        });
+        renderFrontendTable(); // Re-render only FE table
+    }
+
+    // --- DRAG & DROP HANDLERS ---
+    let dragRowIdx = null;
+    function handleDragStart(e, idx) {
+        dragRowIdx = idx;
+        e.dataTransfer.effectAllowed = 'move';
+        e.target.closest('tr').style.opacity = '0.5';
+    }
+    
+    function handleDrop(e, targetIdx) {
+        e.preventDefault();
+        if(dragRowIdx === null) return;
+        saveState();
+        const row = app.rows.splice(dragRowIdx, 1)[0];
+        app.rows.splice(targetIdx, 0, row);
+        renderGrid();
+        dragRowIdx = null;
+    }
+
+    // --- UI CONTROLLERS ---
+    function setMode(m) {
+        app.settings.mode = m;
+        document.getElementById('modeValue').classList.toggle('active', m==='value');
+        document.getElementById('modePercent').classList.toggle('active', m==='percent');
+        updateChartRender();
+    }
+
+    function setView(v) {
+        app.settings.view = v;
+        document.getElementById('viewChart').classList.toggle('active', v==='chart');
+        document.getElementById('viewTable').classList.toggle('active', v==='table');
+        updateChartRender();
+    }
+
+    function toggleStack() {
+        app.settings.stacked = !app.settings.stacked;
+        updateChartRender();
+        showToast("Stacking: " + (app.settings.stacked ? "ON" : "OFF"));
+    }
+
+    function moveCol(idx, dir) {
+        const target = idx + dir;
+        if(target < 0 || target >= app.cols.length) return;
+        saveState();
+        // Swap cols
+        [app.cols[idx], app.cols[target]] = [app.cols[target], app.cols[idx]];
+        // Swap data
+        app.rows.forEach(row => {
+            [row[idx], row[target]] = [row[target], row[idx]];
+        });
+        renderGrid();
+    }
+
+    function saveAll() {
+        // In real plugin: AJAX call to WordPress
+        const json = JSON.stringify(app);
+        console.log("Saving to DB:", json);
+        
+        // Update Shortcode Display
+        document.getElementById('scCode').innerText = `[litestats id="50" type="${app.settings.chartType}"]`;
+        showToast("Plugin Data Saved!", true);
+    }
+    
+    function exportImg() {
+        const link = document.createElement('a');
+        link.download = 'chart.png';
+        link.href = document.getElementById('liveChart').toDataURL();
+        link.click();
+    }
+
+    // --- INITIALIZATION ---
+    window.onload = function() {
+        saveState(); // Init history
+        MathEngine.recalcAll(); // Calc formulas
+        renderGrid(); // Draw Editor
+        // Auto select first col properties
+        selectColumn(1); 
+    };
+
+</script>
+</body>
+</html>
