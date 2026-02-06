@@ -73,8 +73,8 @@ class Shortcode {
     public function add_script_integrity( string $tag, string $handle, string $src ): string {
         // Add integrity for Chart.js CDN.
         if ( 'chartjs' === $handle && strpos( $src, 'cdn.jsdelivr.net' ) !== false ) {
-            // SRI hash for Chart.js 4.4.1.
-            $integrity = 'sha384-UBBogULO3yLoxBu3mcRpFHGrPU/tVV0VaJiEeYQ+ZiMvSKqJMLtQgkBuxkGMTjwS';
+            // SRI hash for Chart.js 4.4.1 UMD build.
+            $integrity = 'sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ';
             $tag = str_replace(
                 ' src=',
                 ' integrity="' . $integrity . '" crossorigin="anonymous" src=',
@@ -186,7 +186,7 @@ class Shortcode {
         // Enqueue Chart.js.
         wp_enqueue_script(
             'chartjs',
-            'https://cdn.jsdelivr.net/npm/chart.js',
+            'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
             [],
             '4.4.1',
             true
