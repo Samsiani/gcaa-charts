@@ -72,7 +72,7 @@ class Admin {
         // Add integrity for Chart.js CDN.
         if ( 'chartjs' === $handle && strpos( $src, 'cdn.jsdelivr.net' ) !== false ) {
             // SRI hash for Chart.js 4.4.1 UMD build.
-            $integrity = 'sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ';
+            $integrity = 'sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4';
             $tag = str_replace(
                 ' src=',
                 ' integrity="' . $integrity . '" crossorigin="anonymous" src=',
