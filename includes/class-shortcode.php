@@ -184,7 +184,7 @@ class Shortcode {
 
         ob_start();
         ?>
-        <?php $has_group = isset( $settings['groupByCol'] ) && $settings['groupByCol'] >= 0; ?>
+        <?php $has_group = isset( $settings['groupByCol'] ) && $settings['groupByCol'] >= 0 && 'table' !== $settings['view']; ?>
         <div class="litestats-container<?php echo $has_group ? ' litestats-has-groups' : ''; ?>" id="<?php echo esc_attr( $instance_id ); ?>" style="width: <?php echo $width; ?>; <?php echo 'table' !== $settings['view'] && ! $has_group ? 'height: ' . $height . ';' : ''; ?>">
             <?php if ( $has_group ) : ?>
                 <div class="litestats-group-sidebar">
@@ -197,12 +197,21 @@ class Shortcode {
                     <div class="litestats-table-wrapper">
                         <div class="litestats-table-toolbar">
                             <?php if ( $settings['tableShowSearch'] ) : ?>
-                                <input type="text" class="litestats-search" placeholder="<?php esc_attr_e( 'Search...', 'litestats-pro' ); ?>" data-target="<?php echo esc_attr( $instance_id ); ?>">
+                                <div class="litestats-search-wrapper">
+                                    <svg class="litestats-search-icon" viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
+                                    <input type="text" class="litestats-search" placeholder="<?php esc_attr_e( 'Search...', 'litestats-pro' ); ?>" data-target="<?php echo esc_attr( $instance_id ); ?>">
+                                </div>
                             <?php endif; ?>
                             <?php if ( $settings['tableShowExport'] ) : ?>
                                 <div class="litestats-export-bar">
-                                    <button class="litestats-btn litestats-export-csv" data-target="<?php echo esc_attr( $instance_id ); ?>"><?php esc_html_e( 'Export CSV', 'litestats-pro' ); ?></button>
-                                    <button class="litestats-btn litestats-print" data-target="<?php echo esc_attr( $instance_id ); ?>"><?php esc_html_e( 'Print', 'litestats-pro' ); ?></button>
+                                    <button class="litestats-btn litestats-btn-export litestats-export-csv" data-target="<?php echo esc_attr( $instance_id ); ?>">
+                                        <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                                        <?php esc_html_e( 'CSV', 'litestats-pro' ); ?>
+                                    </button>
+                                    <button class="litestats-btn litestats-btn-export litestats-print" data-target="<?php echo esc_attr( $instance_id ); ?>">
+                                        <svg viewBox="0 0 20 20" fill="currentColor" width="14" height="14"><path fill-rule="evenodd" d="M5 4v3H4a2 2 0 00-2 2v3a2 2 0 002 2h1v2a2 2 0 002 2h6a2 2 0 002-2v-2h1a2 2 0 002-2V9a2 2 0 00-2-2h-1V4a2 2 0 00-2-2H7a2 2 0 00-2 2zm8 0H7v3h6V4zm0 8H7v4h6v-4z" clip-rule="evenodd"/></svg>
+                                        <?php esc_html_e( 'Print', 'litestats-pro' ); ?>
+                                    </button>
                                 </div>
                             <?php endif; ?>
                         </div>

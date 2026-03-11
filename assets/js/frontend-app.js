@@ -299,21 +299,23 @@
             var filtersEl = tableWrapper.querySelector('.litestats-column-filters');
             if (!filtersEl || !settings.tableColumnFilters) return;
 
+            var fStrings = (typeof liteStatsProFrontend !== 'undefined' && liteStatsProFrontend.strings) ? liteStatsProFrontend.strings : {};
             var html = '<div class="litestats-filter-row">';
             cols.forEach(function(col, i) {
+                var colName = col.name || ('Col ' + i);
                 if (col.type === 'number' || col.type === 'currency' || col.type === 'percentage') {
                     html += '<div class="litestats-filter-cell">' +
-                        '<input type="number" class="litestats-filter-min" data-col="' + i + '" placeholder="Min">' +
-                        '<input type="number" class="litestats-filter-max" data-col="' + i + '" placeholder="Max">' +
+                        '<input type="number" class="litestats-filter-min" data-col="' + i + '" placeholder="' + (fStrings.min || 'Min') + '">' +
+                        '<input type="number" class="litestats-filter-max" data-col="' + i + '" placeholder="' + (fStrings.max || 'Max') + '">' +
                     '</div>';
                 } else if (col.type === 'date') {
                     html += '<div class="litestats-filter-cell">' +
-                        '<input type="date" class="litestats-filter-date-from" data-col="' + i + '">' +
-                        '<input type="date" class="litestats-filter-date-to" data-col="' + i + '">' +
+                        '<input type="date" class="litestats-filter-date-from" data-col="' + i + '" title="' + colName + ' from">' +
+                        '<input type="date" class="litestats-filter-date-to" data-col="' + i + '" title="' + colName + ' to">' +
                     '</div>';
                 } else {
                     html += '<div class="litestats-filter-cell">' +
-                        '<input type="text" class="litestats-filter-text" data-col="' + i + '" placeholder="Filter...">' +
+                        '<input type="text" class="litestats-filter-text" data-col="' + i + '" placeholder="' + colName + '...">' +
                     '</div>';
                 }
             });
@@ -493,12 +495,14 @@
                 return;
             }
 
+            var strings = (typeof liteStatsProFrontend !== 'undefined' && liteStatsProFrontend.strings) ? liteStatsProFrontend.strings : {};
+            var start = (currentPage - 1) * rowsPerPage + 1;
+            var end = Math.min(currentPage * rowsPerPage, filteredRows.length);
             var html = '<div class="litestats-page-info">' +
-                'Page ' + currentPage + ' of ' + totalPages +
-                ' (' + filteredRows.length + ' rows)' +
+                '<strong>' + start + '\u2013' + end + '</strong> ' + (strings.of || 'of') + ' ' + filteredRows.length +
             '</div>';
             html += '<div class="litestats-page-btns">';
-            html += '<button class="litestats-btn litestats-page-prev"' + (currentPage <= 1 ? ' disabled' : '') + '>&laquo; Prev</button>';
+            html += '<button class="litestats-btn litestats-page-prev"' + (currentPage <= 1 ? ' disabled' : '') + '>\u2039 ' + (strings.prev || 'Prev') + '</button>';
 
             // Page numbers (max 7)
             var startPage = Math.max(1, currentPage - 3);
@@ -509,7 +513,7 @@
                 html += '<button class="litestats-btn litestats-page-num' + (p === currentPage ? ' active' : '') + '" data-page="' + p + '">' + p + '</button>';
             }
 
-            html += '<button class="litestats-btn litestats-page-next"' + (currentPage >= totalPages ? ' disabled' : '') + '>Next &raquo;</button>';
+            html += '<button class="litestats-btn litestats-page-next"' + (currentPage >= totalPages ? ' disabled' : '') + '>' + (strings.next || 'Next') + ' \u203a</button>';
             html += '</div>';
 
             paginationEl.innerHTML = html;
@@ -611,7 +615,8 @@
         var config = chartData.config || {};
         var groupCol = settings.groupByCol;
 
-        if (typeof groupCol === 'undefined' || groupCol < 0) return;
+        // Group sidebar is chart-only
+        if (typeof groupCol === 'undefined' || groupCol < 0 || settings.view === 'table') return;
 
         var rows = config.rows || [];
         var sidebar = container.querySelector('.litestats-group-sidebar');
@@ -634,17 +639,20 @@
         // Build sidebar list
         var strings = (typeof liteStatsProFrontend !== 'undefined' && liteStatsProFrontend.strings) ? liteStatsProFrontend.strings : {};
         var allLabel = strings.all || 'All';
-        var html = '<li class="litestats-group-item active" data-group="__all__">' + escapeHtml(allLabel) + ' <span class="litestats-group-count">' + rows.length + '</span></li>';
+        var html = '<li class="litestats-group-item active" data-group="__all__">' +
+            '<span class="litestats-group-name">' + escapeHtml(allLabel) + '</span>' +
+            '<span class="litestats-group-count">' + rows.length + '</span></li>';
         groups.forEach(function(g) {
             var count = rows.filter(function(r) { return String(r[groupCol] || '') === g; }).length;
-            html += '<li class="litestats-group-item" data-group="' + escapeHtml(g) + '">' + escapeHtml(g) + ' <span class="litestats-group-count">' + count + '</span></li>';
+            html += '<li class="litestats-group-item" data-group="' + escapeHtml(g) + '">' +
+                '<span class="litestats-group-name">' + escapeHtml(g) + '</span>' +
+                '<span class="litestats-group-count">' + count + '</span></li>';
         });
         list.innerHTML = html;
 
         // Click handler
         list.querySelectorAll('.litestats-group-item').forEach(function(li) {
             li.addEventListener('click', function() {
-                // Update active state
                 list.querySelectorAll('.litestats-group-item').forEach(function(el) { el.classList.remove('active'); });
                 this.classList.add('active');
 
@@ -656,42 +664,25 @@
                     filteredRows = rows.filter(function(r) { return String(r[groupCol] || '') === group; });
                 }
 
-                // Create filtered chart data
                 var filteredData = {
                     id: chartData.id,
                     config: { cols: config.cols, rows: filteredRows },
                     settings: settings
                 };
 
-                // Clear and re-render content area
+                // Destroy existing chart and re-render
                 var contentArea = container.querySelector('.litestats-content-area');
                 if (!contentArea) return;
 
-                if (settings.view === 'table') {
-                    // Reset table content
-                    var tw = contentArea.querySelector('.litestats-table-wrapper');
-                    if (tw) {
-                        var thead = tw.querySelector('thead');
-                        var tbody = tw.querySelector('tbody');
-                        var pagination = tw.querySelector('.litestats-pagination');
-                        if (thead) thead.innerHTML = '';
-                        if (tbody) tbody.innerHTML = '';
-                        if (pagination) pagination.innerHTML = '';
-                    }
-                    renderTable(containerId, filteredData);
-                } else {
-                    // Destroy existing chart canvas and create new one
-                    var oldCanvas = contentArea.querySelector('.litestats-canvas');
-                    if (oldCanvas) {
-                        // Get existing Chart instance and destroy it
-                        var existingChart = Chart.getChart(oldCanvas);
-                        if (existingChart) existingChart.destroy();
-                        var newCanvas = document.createElement('canvas');
-                        newCanvas.className = 'litestats-canvas';
-                        oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
-                    }
-                    renderChart(containerId, filteredData);
+                var oldCanvas = contentArea.querySelector('.litestats-canvas');
+                if (oldCanvas) {
+                    var existingChart = Chart.getChart(oldCanvas);
+                    if (existingChart) existingChart.destroy();
+                    var newCanvas = document.createElement('canvas');
+                    newCanvas.className = 'litestats-canvas';
+                    oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
                 }
+                renderChart(containerId, filteredData);
             });
         });
     }
