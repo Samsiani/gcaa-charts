@@ -498,16 +498,30 @@
 
         // Search
         function bindSearch() {
+            var wrapper = tableWrapper.querySelector('.litestats-search-wrapper');
             var searchInput = tableWrapper.querySelector('.litestats-search');
+            var clearBtn = tableWrapper.querySelector('.litestats-search-clear');
+
             if (searchInput) {
-                searchInput.addEventListener('input', function() {
-                    searchTerm = this.value.toLowerCase();
+                var doSearch = function() {
+                    searchTerm = searchInput.value.toLowerCase();
+                    if (wrapper) wrapper.classList.toggle('has-value', searchInput.value.length > 0);
                     applyFilters();
                     applySort();
                     currentPage = 1;
                     renderBody();
                     renderPagination();
-                });
+                };
+
+                searchInput.addEventListener('input', doSearch);
+
+                if (clearBtn) {
+                    clearBtn.addEventListener('click', function() {
+                        searchInput.value = '';
+                        searchInput.focus();
+                        doSearch();
+                    });
+                }
             }
         }
 
