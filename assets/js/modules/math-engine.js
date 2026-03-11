@@ -421,14 +421,34 @@
             if (!app || !app.cols || !app.rows) return;
 
             var self = this;
-            // Two passes to handle dependencies between formula columns
+
+            // Build dependency order: detect which columns each formula references.
+            var formulaCols = [];
+            app.cols.forEach(function(col, cIdx) {
+                if (col.type === 'formula' && col.formula) {
+                    formulaCols.push(cIdx);
+                }
+            });
+
+            // Two passes to handle dependencies between formula columns.
+            // Skip columns that reference themselves (would cause infinite recursion).
             for (var pass = 0; pass < 2; pass++) {
-                app.cols.forEach(function(col, cIdx) {
-                    if (col.type === 'formula' && col.formula) {
-                        app.rows.forEach(function(row, rIdx) {
-                            row[cIdx] = self.evaluate(col.formula, rIdx, app.rows, app.cols);
-                        });
+                formulaCols.forEach(function(cIdx) {
+                    var col = app.cols[cIdx];
+                    var letter = colToLetter(cIdx);
+                    // Guard: skip self-referential formulas.
+                    var formulaUpper = col.formula.toUpperCase();
+                    if (formulaUpper.indexOf(letter) !== -1) {
+                        // Check if it's actually referencing this column (not just a substring).
+                        var selfRef = new RegExp('\\b' + letter + '(?:\\d+|\\b)', 'i');
+                        if (selfRef.test(col.formula.substring(1))) {
+                            app.rows.forEach(function(row) { row[cIdx] = '#REF'; });
+                            return;
+                        }
                     }
+                    app.rows.forEach(function(row, rIdx) {
+                        row[cIdx] = self.evaluate(col.formula, rIdx, app.rows, app.cols);
+                    });
                 });
             }
         },

@@ -127,15 +127,6 @@ class Admin {
             return;
         }
 
-        // Chart.js CDN.
-        wp_enqueue_script(
-            'chartjs',
-            'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
-            [],
-            '4.4.1',
-            true
-        );
-
         // Font Awesome.
         wp_enqueue_style(
             'fontawesome',
@@ -159,6 +150,15 @@ class Admin {
         ];
 
         if ( in_array( $hook_suffix, $editor_pages, true ) ) {
+            // Chart.js CDN (editor only).
+            wp_enqueue_script(
+                'chartjs',
+                'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
+                [],
+                '4.4.1',
+                true
+            );
+
             // Math Engine module.
             wp_enqueue_script(
                 'litestats-pro-math-engine',

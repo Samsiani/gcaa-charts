@@ -1079,6 +1079,11 @@
                     if (response.success) {
                         self.showToast(liteStatsProAdmin.strings.saveSuccess);
 
+                        // Refresh nonce for next request.
+                        if (response.data.nonce) {
+                            liteStatsProAdmin.nonce = response.data.nonce;
+                        }
+
                         if (!chartId && response.data.chart_id) {
                             liteStatsProAdmin.chartId = response.data.chart_id;
 

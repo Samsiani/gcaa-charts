@@ -518,7 +518,11 @@
                     renderPagination();
                 };
 
-                searchInput.addEventListener('input', doSearch);
+                var searchTimer = null;
+                searchInput.addEventListener('input', function() {
+                    clearTimeout(searchTimer);
+                    searchTimer = setTimeout(doSearch, 250);
+                });
 
                 if (clearBtn) {
                     clearBtn.addEventListener('click', function() {

@@ -61,7 +61,6 @@ class Ajax {
             wp_send_json_error(
                 [
                     'message' => __( 'Security check failed.', 'litestats-pro' ),
-                    'code'    => 'invalid_nonce',
                 ],
                 403
             );
@@ -72,7 +71,6 @@ class Ajax {
             wp_send_json_error(
                 [
                     'message' => __( 'You do not have permission to perform this action.', 'litestats-pro' ),
-                    'code'    => 'insufficient_permissions',
                 ],
                 403
             );
@@ -105,8 +103,7 @@ class Ajax {
                 wp_send_json_error(
                     [
                         'message' => __( 'Invalid configuration data.', 'litestats-pro' ),
-                        'code'    => 'invalid_json',
-                    ],
+                        ],
                     400
                 );
                 return;
@@ -122,8 +119,7 @@ class Ajax {
                 wp_send_json_error(
                     [
                         'message' => __( 'Invalid settings data.', 'litestats-pro' ),
-                        'code'    => 'invalid_json',
-                    ],
+                        ],
                     400
                 );
                 return;
@@ -138,13 +134,13 @@ class Ajax {
                     [
                         'message'  => __( 'Chart updated successfully.', 'litestats-pro' ),
                         'chart_id' => $chart_id,
+                        'nonce'    => wp_create_nonce( 'litestats_pro_nonce' ),
                     ]
                 );
             } else {
                 wp_send_json_error(
                     [
                         'message' => __( 'Failed to update chart.', 'litestats-pro' ),
-                        'code'    => 'update_failed',
                     ],
                     500
                 );
@@ -157,13 +153,13 @@ class Ajax {
                     [
                         'message'  => __( 'Chart created successfully.', 'litestats-pro' ),
                         'chart_id' => $new_id,
+                        'nonce'    => wp_create_nonce( 'litestats_pro_nonce' ),
                     ]
                 );
             } else {
                 wp_send_json_error(
                     [
                         'message' => __( 'Failed to create chart.', 'litestats-pro' ),
-                        'code'    => 'create_failed',
                     ],
                     500
                 );
@@ -185,7 +181,6 @@ class Ajax {
             wp_send_json_error(
                 [
                     'message' => __( 'Invalid chart ID.', 'litestats-pro' ),
-                    'code'    => 'invalid_id',
                 ],
                 400
             );
@@ -200,7 +195,6 @@ class Ajax {
             wp_send_json_error(
                 [
                     'message' => __( 'Chart not found.', 'litestats-pro' ),
-                    'code'    => 'not_found',
                 ],
                 404
             );
@@ -221,7 +215,6 @@ class Ajax {
             wp_send_json_error(
                 [
                     'message' => __( 'Invalid chart ID.', 'litestats-pro' ),
-                    'code'    => 'invalid_id',
                 ],
                 400
             );
@@ -240,7 +233,6 @@ class Ajax {
             wp_send_json_error(
                 [
                     'message' => __( 'Failed to delete chart.', 'litestats-pro' ),
-                    'code'    => 'delete_failed',
                 ],
                 500
             );
