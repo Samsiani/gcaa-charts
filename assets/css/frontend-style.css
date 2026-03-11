@@ -1,7 +1,7 @@
 /**
  * LiteStats Pro - Frontend Styles
  *
- * Styles for shortcode-rendered charts on the frontend.
+ * Styles for shortcode-rendered charts and tables on the frontend.
  *
  * @package LiteStats\Pro
  * @since   5.0.0
@@ -26,24 +26,100 @@
 
 /* Table Wrapper */
 .litestats-table-wrapper {
-    height: 100%;
-    overflow: auto;
+    overflow: visible;
+}
+
+/* Table Toolbar */
+.litestats-table-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
 }
 
 /* Search */
 .litestats-search {
-    width: 100%;
+    flex: 1;
+    min-width: 200px;
+    max-width: 400px;
     padding: 10px 15px;
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 14px;
-    margin-bottom: 15px;
 }
 
 .litestats-search:focus {
     outline: none;
     border-color: #2271b1;
     box-shadow: 0 0 0 1px #2271b1;
+}
+
+/* Export Bar */
+.litestats-export-bar {
+    display: flex;
+    gap: 6px;
+}
+
+/* Buttons */
+.litestats-btn {
+    padding: 8px 14px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: #333;
+    transition: all 0.2s;
+}
+
+.litestats-btn:hover {
+    border-color: #2271b1;
+    color: #2271b1;
+}
+
+.litestats-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.litestats-btn.active {
+    background: #2271b1;
+    color: #fff;
+    border-color: #2271b1;
+}
+
+/* Column Filters */
+.litestats-column-filters {
+    margin-bottom: 10px;
+}
+
+.litestats-filter-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.litestats-filter-cell {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+    min-width: 100px;
+}
+
+.litestats-filter-cell input {
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+.litestats-filter-cell input:focus {
+    outline: none;
+    border-color: #2271b1;
 }
 
 /* Table */
@@ -64,6 +140,7 @@
     border-bottom: 2px solid #ddd;
     cursor: pointer;
     white-space: nowrap;
+    user-select: none;
 }
 
 .litestats-table th:hover {
@@ -90,6 +167,46 @@
 
 .litestats-table tr:hover {
     background: #fafafa;
+}
+
+/* Striped rows */
+.litestats-table.litestats-striped tbody tr:nth-child(even) {
+    background: #f9f9f9;
+}
+
+.litestats-table.litestats-striped tbody tr:nth-child(even):hover {
+    background: #f0f0f0;
+}
+
+/* Pagination */
+.litestats-pagination {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.litestats-page-info {
+    font-size: 13px;
+    color: #666;
+}
+
+.litestats-page-btns {
+    display: flex;
+    gap: 4px;
+}
+
+.litestats-page-btns .litestats-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.litestats-page-btns .litestats-page-num {
+    min-width: 32px;
+    text-align: center;
+    justify-content: center;
 }
 
 /* Error State */
@@ -130,14 +247,69 @@
 
 /* Responsive */
 @media screen and (max-width: 768px) {
-    .litestats-table {
-        display: block;
+    .litestats-table-wrapper {
         overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
     }
-    
+
+    .litestats-table {
+        min-width: 600px;
+    }
+
+    /* Sticky first column on mobile */
+    .litestats-table th:first-child,
+    .litestats-table td:first-child {
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        background: inherit;
+    }
+
+    .litestats-table th:first-child {
+        background: #f8f9fa;
+    }
+
     .litestats-table th,
     .litestats-table td {
         padding: 8px 10px;
         font-size: 13px;
+    }
+
+    .litestats-table-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .litestats-search {
+        max-width: 100%;
+    }
+
+    .litestats-pagination {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .litestats-filter-row {
+        flex-direction: column;
+    }
+}
+
+/* Print-friendly */
+@media print {
+    .litestats-table-toolbar,
+    .litestats-pagination,
+    .litestats-column-filters,
+    .litestats-export-bar {
+        display: none !important;
+    }
+
+    .litestats-table {
+        border: 1px solid #000;
+    }
+
+    .litestats-table th {
+        background: #eee !important;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
 }

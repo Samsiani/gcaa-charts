@@ -8,7 +8,7 @@
  * @since   5.1.0
  */
 
-/* global LiteStatsMathEngine, LiteStatsState, LiteStatsColToLetter */
+/* global LiteStatsMathEngine, LiteStatsState, LiteStatsColToLetter, LiteStatsConditionalFormat */
 
 (function(window) {
     'use strict';
@@ -30,6 +30,18 @@
                 return val;
             }
 
+            // Date type
+            if (col.type === 'date') {
+                if (!val || val === '') return '';
+                try {
+                    var d = new Date(val);
+                    if (!isNaN(d.getTime())) {
+                        return d.toLocaleDateString();
+                    }
+                } catch(e) { /* fall through */ }
+                return val;
+            }
+
             var num = parseFloat(val);
             if (isNaN(num)) {
                 return val;
@@ -40,22 +52,55 @@
                 num = num * 100;
             }
 
+            // Currency: add thousands separator
+            if (col.type === 'currency') {
+                var symbol = (col.props && col.props.currencySymbol) ? col.props.currencySymbol : ((col.props && col.props.prefix) ? col.props.prefix : '$');
+                var precision = (col.props && col.props.precision) ? parseInt(col.props.precision, 10) : 2;
+                return symbol + num.toLocaleString(undefined, { minimumFractionDigits: precision, maximumFractionDigits: precision });
+            }
+
+            // Percentage type
+            if (col.type === 'percentage') {
+                var pPrecision = (col.props && col.props.precision) ? parseInt(col.props.precision, 10) : 1;
+                var suffix = (col.props && col.props.suffix) ? col.props.suffix : '%';
+                return num.toFixed(pPrecision) + suffix;
+            }
+
             var precision = (col.props && col.props.precision) ? col.props.precision : null;
             if (precision !== null) {
                 num = num.toFixed(precision);
             } else if (col.type === 'formula' && num !== Math.floor(num)) {
-                // Auto-round formula results to 2 decimals when no precision is set
                 num = num.toFixed(2);
             }
 
             var prefix = (col.props && col.props.prefix) ? col.props.prefix : '';
-            var suffix = (col.props && col.props.suffix) ? col.props.suffix : '';
+            var suffixStr = (col.props && col.props.suffix) ? col.props.suffix : '';
 
             if (col.type === 'formula' && col.props && col.props.isPercent) {
-                suffix = suffix + '%';
+                suffixStr = suffixStr + '%';
             }
 
-            return prefix + num + suffix;
+            return prefix + num + suffixStr;
+        },
+
+        /**
+         * Get type selector options HTML for column header.
+         */
+        getTypeOptions: function(currentType) {
+            var types = [
+                { value: 'string', label: 'ABC' },
+                { value: 'number', label: '123' },
+                { value: 'date', label: '\uD83D\uDCC5' },
+                { value: 'currency', label: '$' },
+                { value: 'percentage', label: '%' }
+            ];
+
+            var html = '';
+            for (var i = 0; i < types.length; i++) {
+                var sel = (currentType === types[i].value) ? ' selected' : '';
+                html += '<option value="' + types[i].value + '"' + sel + '>' + types[i].label + '</option>';
+            }
+            return html;
         },
 
         /**
@@ -75,8 +120,9 @@
                 return s;
             };
 
+            var condRules = (app.settings && app.settings.conditionalRules) || [];
+
             // === HEADERS ===
-            // Row number column + data columns
             var hHtml = '<tr><th class="row-num-header"></th>';
 
             app.cols.forEach(function(col, idx) {
@@ -88,8 +134,7 @@
                     typeLabel = '<span class="col-type-label">\u0192(x)</span>';
                 } else {
                     typeLabel = '<select class="col-type-select" data-col-idx="' + idx + '">' +
-                        '<option value="string"' + (col.type === 'string' ? ' selected' : '') + '>ABC</option>' +
-                        '<option value="number"' + (col.type === 'number' ? ' selected' : '') + '>123</option>' +
+                        self.getTypeOptions(col.type) +
                     '</select>';
                 }
 
@@ -112,19 +157,18 @@
 
             // === ROWS ===
             var bHtml = '';
+            var CF = window.LiteStatsConditionalFormat;
 
             app.rows.forEach(function(row, rIdx) {
                 var rowNum = rIdx + 1;
                 bHtml += '<tr>';
 
-                // Row number + handle + delete
                 bHtml += '<td class="row-handle" draggable="true" data-row-idx="' + rIdx + '">' +
                     '<span class="row-num">' + rowNum + '</span>' +
                     '<i class="fas fa-grip-vertical row-grip"></i>' +
                     '<i class="fas fa-times del-row" data-row-idx="' + rIdx + '"></i>' +
                 '</td>';
 
-                // Data cells
                 row.forEach(function(cell, cIdx) {
                     var col = app.cols[cIdx];
                     var isFormula = col.type === 'formula';
@@ -133,18 +177,25 @@
                     var cls = 'cell-input';
                     if (isFormula) cls += ' cell-calculated';
 
-                    // Conditional formatting
+                    // Growth conditional formatting (legacy)
                     if (col.name.toLowerCase().indexOf('growth') !== -1 || col.name.indexOf('%') !== -1) {
                         var n = parseFloat(cell);
                         if (n > 0) cls += ' val-pos';
                         if (n < 0) cls += ' val-neg';
                     }
 
+                    // Conditional formatting rules
+                    var cellStyle = '';
+                    if (CF && condRules.length) {
+                        cellStyle = CF.getCellStyle(cell, cIdx, condRules);
+                    }
+
                     var readonly = isFormula ? 'readonly' : '';
 
                     bHtml += '<td>' +
                         '<input class="' + cls + '" value="' + self.escapeHtml(String(displayVal)) + '" ' +
-                               readonly + ' data-row-idx="' + rIdx + '" data-col-idx="' + cIdx + '">' +
+                               readonly + ' data-row-idx="' + rIdx + '" data-col-idx="' + cIdx + '"' +
+                               (cellStyle ? ' style="' + cellStyle + '"' : '') + '>' +
                     '</td>';
                 });
 

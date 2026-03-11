@@ -40,8 +40,6 @@ class Admin {
 
     /**
      * Constructor.
-     *
-     * @since 5.0.0
      */
     public function __construct() {
         $this->init_hooks();
@@ -49,8 +47,6 @@ class Admin {
 
     /**
      * Initialize hooks.
-     *
-     * @since 5.0.0
      */
     private function init_hooks(): void {
         add_action( 'admin_menu', [ $this, 'register_admin_menu' ] );
@@ -60,18 +56,9 @@ class Admin {
 
     /**
      * Add SRI integrity attribute to CDN scripts.
-     *
-     * @since 5.0.0
-     *
-     * @param string $tag    The script tag HTML.
-     * @param string $handle The script handle.
-     * @param string $src    The script source URL.
-     * @return string Modified script tag.
      */
     public function add_script_integrity( string $tag, string $handle, string $src ): string {
-        // Add integrity for Chart.js CDN.
         if ( 'chartjs' === $handle && strpos( $src, 'cdn.jsdelivr.net' ) !== false ) {
-            // SRI hash for Chart.js 4.4.1 UMD build.
             $integrity = 'sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4';
             $tag = str_replace(
                 ' src=',
@@ -84,8 +71,6 @@ class Admin {
 
     /**
      * Register admin menu.
-     *
-     * @since 5.0.0
      */
     public function register_admin_menu(): void {
         $this->hook_suffix = add_menu_page(
@@ -98,7 +83,6 @@ class Admin {
             30
         );
 
-        // Add submenu for Charts list.
         add_submenu_page(
             self::PAGE_SLUG,
             __( 'All Charts', 'litestats-pro' ),
@@ -108,7 +92,6 @@ class Admin {
             [ $this, 'render_admin_page' ]
         );
 
-        // Add submenu for creating new chart.
         add_submenu_page(
             self::PAGE_SLUG,
             __( 'Add New Chart', 'litestats-pro' ),
@@ -118,9 +101,8 @@ class Admin {
             [ $this, 'render_editor_page' ]
         );
 
-        // Add submenu for editing chart (hidden from menu).
         add_submenu_page(
-            null, // Hidden from menu.
+            null,
             __( 'Edit Chart', 'litestats-pro' ),
             __( 'Edit Chart', 'litestats-pro' ),
             'manage_options',
@@ -132,14 +114,9 @@ class Admin {
     /**
      * Enqueue admin assets.
      *
-     * Only loads on plugin-specific admin pages for performance.
-     *
-     * @since 5.0.0
-     *
      * @param string $hook_suffix Current admin page hook suffix.
      */
     public function enqueue_admin_assets( string $hook_suffix ): void {
-        // Only enqueue on our plugin pages.
         $plugin_pages = [
             'toplevel_page_' . self::PAGE_SLUG,
             'litestats-pro_page_' . self::PAGE_SLUG . '-new',
@@ -150,7 +127,7 @@ class Admin {
             return;
         }
 
-        // Enqueue Chart.js from CDN.
+        // Chart.js CDN.
         wp_enqueue_script(
             'chartjs',
             'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
@@ -159,7 +136,7 @@ class Admin {
             true
         );
 
-        // Enqueue Font Awesome.
+        // Font Awesome.
         wp_enqueue_style(
             'fontawesome',
             'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css',
@@ -167,7 +144,7 @@ class Admin {
             '6.4.0'
         );
 
-        // Enqueue admin styles.
+        // Admin styles.
         wp_enqueue_style(
             'litestats-pro-admin',
             LITESTATS_PRO_PLUGIN_URL . 'assets/css/admin-style.css',
@@ -175,14 +152,14 @@ class Admin {
             LITESTATS_PRO_VERSION
         );
 
-        // Check if we're on the editor pages.
+        // Editor pages only.
         $editor_pages = [
             'litestats-pro_page_' . self::PAGE_SLUG . '-new',
             'admin_page_' . self::PAGE_SLUG . '-edit',
         ];
 
         if ( in_array( $hook_suffix, $editor_pages, true ) ) {
-            // Enqueue Math Engine module.
+            // Math Engine module.
             wp_enqueue_script(
                 'litestats-pro-math-engine',
                 LITESTATS_PRO_PLUGIN_URL . 'assets/js/modules/math-engine.js',
@@ -191,7 +168,7 @@ class Admin {
                 true
             );
 
-            // Enqueue State/History module.
+            // State/History module.
             wp_enqueue_script(
                 'litestats-pro-state',
                 LITESTATS_PRO_PLUGIN_URL . 'assets/js/modules/state.js',
@@ -200,7 +177,7 @@ class Admin {
                 true
             );
 
-            // Enqueue Grid UI module.
+            // Grid UI module.
             wp_enqueue_script(
                 'litestats-pro-grid-ui',
                 LITESTATS_PRO_PLUGIN_URL . 'assets/js/modules/grid-ui.js',
@@ -209,11 +186,29 @@ class Admin {
                 true
             );
 
-            // Enqueue main admin app.
+            // CSV Wizard module.
+            wp_enqueue_script(
+                'litestats-pro-csv-wizard',
+                LITESTATS_PRO_PLUGIN_URL . 'assets/js/modules/csv-wizard.js',
+                [],
+                LITESTATS_PRO_VERSION,
+                true
+            );
+
+            // Conditional Formatting module.
+            wp_enqueue_script(
+                'litestats-pro-conditional-format',
+                LITESTATS_PRO_PLUGIN_URL . 'assets/js/modules/conditional-format.js',
+                [],
+                LITESTATS_PRO_VERSION,
+                true
+            );
+
+            // Main admin app.
             wp_enqueue_script(
                 'litestats-pro-admin-app',
                 LITESTATS_PRO_PLUGIN_URL . 'assets/js/admin-app.js',
-                [ 'jquery', 'chartjs', 'litestats-pro-math-engine', 'litestats-pro-state', 'litestats-pro-grid-ui' ],
+                [ 'jquery', 'chartjs', 'litestats-pro-math-engine', 'litestats-pro-state', 'litestats-pro-grid-ui', 'litestats-pro-csv-wizard', 'litestats-pro-conditional-format' ],
                 LITESTATS_PRO_VERSION,
                 true
             );
@@ -229,7 +224,6 @@ class Admin {
                 }
             }
 
-            // Localize script with data.
             wp_localize_script(
                 'litestats-pro-admin-app',
                 'liteStatsProAdmin',
@@ -259,42 +253,31 @@ class Admin {
 
     /**
      * Render admin page (charts list).
-     *
-     * @since 5.0.0
      */
     public function render_admin_page(): void {
-        // Security check.
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'litestats-pro' ) );
         }
 
-        // Get all charts.
         $data_handler = LiteStatsPro::get_instance()->get_data_handler();
         $charts       = $data_handler ? $data_handler->get_all_charts() : [];
 
-        // Include the template.
         include LITESTATS_PRO_PLUGIN_DIR . 'templates/admin-charts-list.php';
     }
 
     /**
      * Render editor page (create/edit chart).
-     *
-     * @since 5.0.0
      */
     public function render_editor_page(): void {
-        // Security check.
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'litestats-pro' ) );
         }
 
-        // Include the template.
         include LITESTATS_PRO_PLUGIN_DIR . 'templates/admin-dashboard.php';
     }
 
     /**
      * Get the admin page URL.
-     *
-     * @since 5.0.0
      *
      * @param string $page Page slug suffix.
      * @param array  $args Additional query args.

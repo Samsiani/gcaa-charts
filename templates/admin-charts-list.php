@@ -43,9 +43,22 @@ if ( ! defined( 'ABSPATH' ) ) {
             </a>
         </div>
     <?php else : ?>
+        <form id="bulkDeleteForm">
+        <div class="tablenav top">
+            <div class="alignleft actions bulknav">
+                <select id="bulkAction">
+                    <option value=""><?php esc_html_e( 'Bulk Actions', 'litestats-pro' ); ?></option>
+                    <option value="delete"><?php esc_html_e( 'Delete', 'litestats-pro' ); ?></option>
+                </select>
+                <button type="button" class="button action" id="bulkApplyBtn"><?php esc_html_e( 'Apply', 'litestats-pro' ); ?></button>
+            </div>
+        </div>
         <table class="wp-list-table widefat fixed striped litestats-charts-table">
             <thead>
                 <tr>
+                    <td class="manage-column column-cb check-column">
+                        <input type="checkbox" id="cb-select-all">
+                    </td>
                     <th scope="col" class="column-title column-primary">
                         <?php esc_html_e( 'Title', 'litestats-pro' ); ?>
                     </th>
@@ -65,7 +78,10 @@ if ( ! defined( 'ABSPATH' ) ) {
             </thead>
             <tbody>
                 <?php foreach ( $charts as $chart ) : ?>
-                    <tr>
+                    <tr data-chart-id="<?php echo esc_attr( $chart['id'] ); ?>">
+                        <th scope="row" class="check-column">
+                            <input type="checkbox" class="chart-cb" value="<?php echo esc_attr( $chart['id'] ); ?>">
+                        </th>
                         <td class="column-title column-primary">
                             <strong>
                                 <a href="<?php echo esc_url( Admin::get_admin_url( 'edit', [ 'chart_id' => $chart['id'] ] ) ); ?>" class="row-title">
@@ -109,6 +125,7 @@ if ( ! defined( 'ABSPATH' ) ) {
                 <?php endforeach; ?>
             </tbody>
         </table>
+        </form>
     <?php endif; ?>
 </div>
 
@@ -156,5 +173,56 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         });
     });
+
+    // Select all checkbox.
+    var selectAll = document.getElementById('cb-select-all');
+    if (selectAll) {
+        selectAll.addEventListener('change', function() {
+            var checked = this.checked;
+            document.querySelectorAll('.chart-cb').forEach(function(cb) {
+                cb.checked = checked;
+            });
+        });
+    }
+
+    // Bulk delete.
+    var bulkApply = document.getElementById('bulkApplyBtn');
+    if (bulkApply) {
+        bulkApply.addEventListener('click', function() {
+            var action = document.getElementById('bulkAction').value;
+            if (action !== 'delete') return;
+
+            var checked = document.querySelectorAll('.chart-cb:checked');
+            if (!checked.length) return;
+
+            if (!confirm('<?php echo esc_js( __( 'Delete selected charts?', 'litestats-pro' ) ); ?>')) return;
+
+            var nonce = '<?php echo esc_js( wp_create_nonce( 'litestats_pro_nonce' ) ); ?>';
+            var promises = [];
+
+            checked.forEach(function(cb) {
+                var chartId = cb.value;
+                promises.push(
+                    fetch('<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'action=litestats_delete_chart&chart_id=' + chartId + '&nonce=' + nonce
+                    }).then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        if (data.success) {
+                            var row = document.querySelector('tr[data-chart-id="' + chartId + '"]');
+                            if (row) row.remove();
+                        }
+                    })
+                );
+            });
+
+            Promise.all(promises).then(function() {
+                if (document.getElementById('cb-select-all')) {
+                    document.getElementById('cb-select-all').checked = false;
+                }
+            });
+        });
+    }
 });
 </script>

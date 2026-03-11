@@ -1,7 +1,8 @@
 /**
  * LiteStats Pro - Frontend Application
  *
- * Handles chart rendering on the frontend via shortcodes.
+ * Handles chart and table rendering on the frontend via shortcodes.
+ * Features: pagination, column filters, CSV export, print, responsive tables.
  *
  * @package LiteStats\Pro
  * @since   5.0.0
@@ -24,24 +25,46 @@
 
     /**
      * Format a value based on column properties.
-     *
-     * @param {*} val - The value to format.
-     * @param {Object} col - The column configuration.
-     * @returns {string} Formatted value.
      */
     function formatValue(val, col) {
         if (col.type === 'string') {
-            return val;
+            return escapeHtml(val);
+        }
+
+        // Date type
+        if (col.type === 'date') {
+            if (!val || val === '') return '';
+            try {
+                var d = new Date(val);
+                if (!isNaN(d.getTime())) {
+                    return d.toLocaleDateString();
+                }
+            } catch(e) { /* fall through */ }
+            return escapeHtml(val);
         }
 
         var num = parseFloat(val);
         if (isNaN(num)) {
-            return val;
+            return escapeHtml(val);
         }
 
-        // Handle percentage display for formula columns
+        // Percentage display for formula columns
         if (col.type === 'formula' && col.props && col.props.isPercent) {
             num = num * 100;
+        }
+
+        // Currency
+        if (col.type === 'currency') {
+            var symbol = (col.props && col.props.currencySymbol) ? col.props.currencySymbol : ((col.props && col.props.prefix) ? col.props.prefix : '$');
+            var cp = (col.props && col.props.precision) ? parseInt(col.props.precision, 10) : 2;
+            return symbol + num.toLocaleString(undefined, { minimumFractionDigits: cp, maximumFractionDigits: cp });
+        }
+
+        // Percentage type
+        if (col.type === 'percentage') {
+            var pp = (col.props && col.props.precision) ? parseInt(col.props.precision, 10) : 1;
+            var suffix = (col.props && col.props.suffix) ? col.props.suffix : '%';
+            return num.toFixed(pp) + suffix;
         }
 
         var precision = (col.props && col.props.precision) ? col.props.precision : null;
@@ -52,32 +75,51 @@
         }
 
         var prefix = (col.props && col.props.prefix) ? col.props.prefix : '';
-        var suffix = (col.props && col.props.suffix) ? col.props.suffix : '';
+        var suffixStr = (col.props && col.props.suffix) ? col.props.suffix : '';
 
-        // Append % suffix for percentage formula columns
         if (col.type === 'formula' && col.props && col.props.isPercent) {
-            suffix = suffix + '%';
+            suffixStr = suffixStr + '%';
         }
 
-        return prefix + num + suffix;
+        return prefix + num + suffixStr;
+    }
+
+    function escapeHtml(str) {
+        if (typeof str !== 'string') return str;
+        var div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    /**
+     * Get data column indices based on chart settings.
+     */
+    function getDataColumnIndices(cols, settings) {
+        var labelCol = settings.chartLabelCol || 0;
+
+        if (settings.chartDataCols && settings.chartDataCols.length > 0) {
+            return settings.chartDataCols;
+        }
+
+        var indices = [];
+        for (var i = 0; i < cols.length; i++) {
+            if (i === labelCol) continue;
+            if (cols[i].type !== 'string' && cols[i].type !== 'date') {
+                indices.push(i);
+            }
+        }
+        return indices;
     }
 
     /**
      * Render a chart.
-     *
-     * @param {string} containerId - The container element ID.
-     * @param {Object} chartData - The chart data.
      */
     function renderChart(containerId, chartData) {
         var container = document.getElementById(containerId);
-        if (!container) {
-            return;
-        }
+        if (!container) return;
 
         var canvas = container.querySelector('.litestats-canvas');
-        if (!canvas) {
-            return;
-        }
+        if (!canvas) return;
 
         var config = chartData.config || {};
         var settings = chartData.settings || {};
@@ -86,93 +128,101 @@
 
         var ctx = canvas.getContext('2d');
         var palette = themes[settings.theme] || themes['default'];
+        var labelCol = settings.chartLabelCol || 0;
+        var dataCols = getDataColumnIndices(cols, settings);
 
-        // Data Prep
-        var labels = rows.map(function(r) { return r[0]; });
+        // Labels
+        var labels = rows.map(function(r) { return r[labelCol]; });
         var datasets = [];
         var colorIdx = 0;
 
-        for (var i = 1; i < cols.length; i++) {
-            var col = cols[i];
+        for (var di = 0; di < dataCols.length; di++) {
+            var colIdx = dataCols[di];
+            var col = cols[colIdx];
             var type = settings.chartType || 'bar';
 
             if (type === 'combo') {
-                type = (i === cols.length - 1) ? 'line' : 'bar';
+                type = (di === dataCols.length - 1) ? 'line' : 'bar';
             }
 
-            if (settings.chartType === 'pie' && i > 1) {
+            if ((settings.chartType === 'pie' || settings.chartType === 'doughnut') && di > 0) {
                 continue;
             }
+
+            var seriesColor = (settings.seriesColors && settings.seriesColors[colIdx]) || palette[colorIdx % palette.length];
 
             datasets.push({
                 type: type === 'combo' ? 'bar' : type,
                 label: col.name,
                 data: rows.map(function(r) {
-                    var val = r[i];
+                    var val = r[colIdx];
                     if (typeof val === 'string') {
                         val = val.replace(/[$,%]/g, '');
                     }
                     return parseFloat(val) || 0;
                 }),
-                backgroundColor: settings.chartType === 'pie' ? palette : palette[colorIdx % palette.length],
-                borderColor: settings.chartType === 'pie' ? '#fff' : palette[colorIdx % palette.length],
+                backgroundColor: (settings.chartType === 'pie' || settings.chartType === 'doughnut') ? palette : seriesColor,
+                borderColor: (settings.chartType === 'pie' || settings.chartType === 'doughnut') ? '#fff' : seriesColor,
                 borderWidth: 2,
-                fill: type === 'line' && !settings.stacked,
-                tension: 0.4
+                fill: (type === 'line') ? (settings.fillArea || false) : false,
+                tension: settings.lineTension || 0.4
             });
             colorIdx++;
         }
 
-        // SAFETY CHECK: Ensure Chart library is loaded
         if (typeof Chart === 'undefined') {
-            console.error('Chart.js library not loaded. Skipping chart render.');
-            // Optionally display a warning in the UI
-            if (ctx) {
-                ctx.font = '14px Arial';
-                ctx.fillStyle = 'red';
-                ctx.fillText('Chart library missing', 10, 50);
-            }
+            console.error('Chart.js library not loaded.');
             return;
         }
 
-        // Create chart
+        var isPie = settings.chartType === 'pie' || settings.chartType === 'doughnut';
+
         new Chart(ctx, {
             type: settings.chartType === 'combo' ? 'bar' : (settings.chartType || 'bar'),
             data: { labels: labels, datasets: datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                scales: settings.chartType === 'pie' ? {} : {
-                    x: { stacked: settings.stacked || false },
-                    y: { stacked: settings.stacked || false, beginAtZero: true }
+                scales: isPie ? {} : {
+                    x: {
+                        stacked: settings.stacked || false,
+                        title: {
+                            display: !!settings.xAxisLabel,
+                            text: settings.xAxisLabel || ''
+                        }
+                    },
+                    y: {
+                        stacked: settings.stacked || false,
+                        beginAtZero: settings.beginAtZero !== false,
+                        title: {
+                            display: !!settings.yAxisLabel,
+                            text: settings.yAxisLabel || ''
+                        }
+                    }
                 },
                 plugins: {
+                    legend: {
+                        position: settings.legendPosition || 'top'
+                    },
                     tooltip: {
                         callbacks: {
                             label: function(context) {
                                 var label = context.label || '';
                                 var value = context.raw;
 
-                                // Specific logic for Pie/Donut charts
                                 if (context.chart.config.type === 'pie' || context.chart.config.type === 'doughnut') {
                                     var dataset = context.dataset;
                                     var meta = context.chart.getDatasetMeta(context.datasetIndex);
                                     var total = meta.total;
-
-                                    // Manual calculation fallback
                                     if (!total) {
                                         total = dataset.data.reduce(function(acc, val) {
                                             return acc + (parseFloat(val) || 0);
                                         }, 0);
                                     }
-
                                     var percentage = parseFloat((value / total * 100).toFixed(1));
-
-                                    // Only return Value and Percent. Label is already in the Header.
                                     return value + ' (' + percentage + '%)';
                                 }
 
-                                // Default behavior for other charts
                                 return label + ': ' + value;
                             }
                         }
@@ -183,100 +233,361 @@
     }
 
     /**
-     * Render a table.
-     *
-     * @param {string} containerId - The container element ID.
-     * @param {Object} chartData - The chart data.
+     * Render a table with pagination, filters, export, and responsive support.
      */
     function renderTable(containerId, chartData) {
         var container = document.getElementById(containerId);
-        if (!container) {
-            return;
-        }
+        if (!container) return;
 
         var tableWrapper = container.querySelector('.litestats-table-wrapper');
-        if (!tableWrapper) {
-            return;
-        }
+        if (!tableWrapper) return;
 
         var config = chartData.config || {};
+        var settings = chartData.settings || {};
         var cols = config.cols || [];
-        var rows = config.rows || [];
+        var allRows = config.rows || [];
+        var condRules = settings.conditionalRules || [];
 
         var table = tableWrapper.querySelector('.litestats-table');
         var thead = table.querySelector('thead');
         var tbody = table.querySelector('tbody');
+        var paginationEl = tableWrapper.querySelector('.litestats-pagination');
+
+        // State
+        var currentPage = 1;
+        var rowsPerPage = settings.tableRowsPerPage || 25;
+        var sortCol = -1;
+        var sortAsc = true;
+        var searchTerm = '';
+        var columnFilters = {};
+        var filteredRows = allRows.slice();
 
         // Render headers
-        var hHtml = '<tr>';
-        cols.forEach(function(col, i) {
-            hHtml += '<th data-sort-idx="' + i + '">' + col.name + ' <span class="sort-icon">↕</span></th>';
-        });
-        thead.innerHTML = hHtml + '</tr>';
-
-        // Render rows
-        var bHtml = '';
-        rows.forEach(function(row) {
-            bHtml += '<tr>';
-            row.forEach(function(cell, i) {
-                var formatted = formatValue(cell, cols[i]);
-                bHtml += '<td>' + formatted + '</td>';
+        function renderHeaders() {
+            var hHtml = '<tr>';
+            cols.forEach(function(col, i) {
+                hHtml += '<th data-sort-idx="' + i + '">' + escapeHtml(col.name) + ' <span class="sort-icon">\u2195</span></th>';
             });
-            bHtml += '</tr>';
-        });
-        tbody.innerHTML = bHtml;
+            thead.innerHTML = hHtml + '</tr>';
 
-        // Sort functionality
-        thead.querySelectorAll('th').forEach(function(th) {
-            th.addEventListener('click', function() {
-                var idx = parseInt(this.dataset.sortIdx, 10);
-                sortTable(tbody, rows, cols, idx);
-            });
-        });
-
-        // Search functionality
-        var searchInput = tableWrapper.querySelector('.litestats-search');
-        if (searchInput) {
-            searchInput.addEventListener('keyup', function() {
-                var term = this.value.toLowerCase();
-                var tbodyRows = tbody.querySelectorAll('tr');
-                tbodyRows.forEach(function(row) {
-                    var text = row.textContent.toLowerCase();
-                    row.style.display = text.indexOf(term) !== -1 ? '' : 'none';
+            thead.querySelectorAll('th').forEach(function(th) {
+                th.addEventListener('click', function() {
+                    var idx = parseInt(this.dataset.sortIdx, 10);
+                    if (sortCol === idx) {
+                        sortAsc = !sortAsc;
+                    } else {
+                        sortCol = idx;
+                        sortAsc = true;
+                    }
+                    applySort();
+                    renderBody();
+                    renderPagination();
                 });
             });
         }
-    }
 
-    /**
-     * Sort table rows.
-     *
-     * @param {HTMLElement} tbody - The table body element.
-     * @param {Array} rows - The data rows.
-     * @param {Array} cols - The columns configuration.
-     * @param {number} colIdx - The column index to sort by.
-     */
-    function sortTable(tbody, rows, cols, colIdx) {
-        rows.sort(function(a, b) {
-            var v1 = a[colIdx];
-            var v2 = b[colIdx];
-            if (cols[colIdx].type === 'number') {
-                return parseFloat(v1) - parseFloat(v2);
-            }
-            return v1.toString().localeCompare(v2);
-        });
+        // Column filters
+        function renderColumnFilters() {
+            var filtersEl = tableWrapper.querySelector('.litestats-column-filters');
+            if (!filtersEl || !settings.tableColumnFilters) return;
 
-        // Re-render tbody
-        var bHtml = '';
-        rows.forEach(function(row) {
-            bHtml += '<tr>';
-            row.forEach(function(cell, i) {
-                var formatted = formatValue(cell, cols[i]);
-                bHtml += '<td>' + formatted + '</td>';
+            var html = '<div class="litestats-filter-row">';
+            cols.forEach(function(col, i) {
+                if (col.type === 'number' || col.type === 'currency' || col.type === 'percentage') {
+                    html += '<div class="litestats-filter-cell">' +
+                        '<input type="number" class="litestats-filter-min" data-col="' + i + '" placeholder="Min">' +
+                        '<input type="number" class="litestats-filter-max" data-col="' + i + '" placeholder="Max">' +
+                    '</div>';
+                } else if (col.type === 'date') {
+                    html += '<div class="litestats-filter-cell">' +
+                        '<input type="date" class="litestats-filter-date-from" data-col="' + i + '">' +
+                        '<input type="date" class="litestats-filter-date-to" data-col="' + i + '">' +
+                    '</div>';
+                } else {
+                    html += '<div class="litestats-filter-cell">' +
+                        '<input type="text" class="litestats-filter-text" data-col="' + i + '" placeholder="Filter...">' +
+                    '</div>';
+                }
             });
-            bHtml += '</tr>';
-        });
-        tbody.innerHTML = bHtml;
+            html += '</div>';
+            filtersEl.innerHTML = html;
+
+            // Bind filter events
+            filtersEl.querySelectorAll('input').forEach(function(input) {
+                input.addEventListener('input', function() {
+                    applyFilters();
+                    currentPage = 1;
+                    renderBody();
+                    renderPagination();
+                });
+            });
+        }
+
+        // Apply search + column filters
+        function applyFilters() {
+            filteredRows = allRows.filter(function(row) {
+                // Global search
+                if (searchTerm) {
+                    var match = false;
+                    for (var i = 0; i < row.length; i++) {
+                        if (String(row[i]).toLowerCase().indexOf(searchTerm) !== -1) {
+                            match = true;
+                            break;
+                        }
+                    }
+                    if (!match) return false;
+                }
+
+                // Column filters
+                if (settings.tableColumnFilters) {
+                    var filtersEl = tableWrapper.querySelector('.litestats-column-filters');
+                    if (filtersEl) {
+                        // Text filters
+                        var textFilters = filtersEl.querySelectorAll('.litestats-filter-text');
+                        for (var t = 0; t < textFilters.length; t++) {
+                            var tf = textFilters[t];
+                            if (tf.value) {
+                                var ci = parseInt(tf.dataset.col, 10);
+                                if (String(row[ci]).toLowerCase().indexOf(tf.value.toLowerCase()) === -1) return false;
+                            }
+                        }
+                        // Min/Max filters
+                        var minFilters = filtersEl.querySelectorAll('.litestats-filter-min');
+                        for (var m = 0; m < minFilters.length; m++) {
+                            if (minFilters[m].value !== '') {
+                                var mci = parseInt(minFilters[m].dataset.col, 10);
+                                if (parseFloat(row[mci]) < parseFloat(minFilters[m].value)) return false;
+                            }
+                        }
+                        var maxFilters = filtersEl.querySelectorAll('.litestats-filter-max');
+                        for (var mx = 0; mx < maxFilters.length; mx++) {
+                            if (maxFilters[mx].value !== '') {
+                                var mxci = parseInt(maxFilters[mx].dataset.col, 10);
+                                if (parseFloat(row[mxci]) > parseFloat(maxFilters[mx].value)) return false;
+                            }
+                        }
+                        // Date filters
+                        var dateFroms = filtersEl.querySelectorAll('.litestats-filter-date-from');
+                        for (var df = 0; df < dateFroms.length; df++) {
+                            if (dateFroms[df].value) {
+                                var dci = parseInt(dateFroms[df].dataset.col, 10);
+                                if (new Date(row[dci]) < new Date(dateFroms[df].value)) return false;
+                            }
+                        }
+                        var dateTos = filtersEl.querySelectorAll('.litestats-filter-date-to');
+                        for (var dt = 0; dt < dateTos.length; dt++) {
+                            if (dateTos[dt].value) {
+                                var dtci = parseInt(dateTos[dt].dataset.col, 10);
+                                if (new Date(row[dtci]) > new Date(dateTos[dt].value)) return false;
+                            }
+                        }
+                    }
+                }
+
+                return true;
+            });
+        }
+
+        // Sort
+        function applySort() {
+            if (sortCol < 0) return;
+            filteredRows.sort(function(a, b) {
+                var v1 = a[sortCol], v2 = b[sortCol];
+                var col = cols[sortCol];
+                var result;
+                if (col.type === 'number' || col.type === 'currency' || col.type === 'percentage') {
+                    result = parseFloat(v1) - parseFloat(v2);
+                } else if (col.type === 'date') {
+                    result = new Date(v1) - new Date(v2);
+                } else {
+                    result = String(v1).localeCompare(String(v2));
+                }
+                return sortAsc ? result : -result;
+            });
+        }
+
+        // Render body with pagination
+        function renderBody() {
+            var totalPages = Math.ceil(filteredRows.length / rowsPerPage) || 1;
+            if (currentPage > totalPages) currentPage = totalPages;
+
+            var start = (currentPage - 1) * rowsPerPage;
+            var pageRows = filteredRows.slice(start, start + rowsPerPage);
+
+            var bHtml = '';
+            pageRows.forEach(function(row) {
+                bHtml += '<tr>';
+                row.forEach(function(cell, i) {
+                    var formatted = formatValue(cell, cols[i]);
+                    var cellStyle = getCellStyle(cell, i, condRules);
+                    bHtml += '<td' + (cellStyle ? ' style="' + cellStyle + '"' : '') + '>' + formatted + '</td>';
+                });
+                bHtml += '</tr>';
+            });
+            tbody.innerHTML = bHtml;
+        }
+
+        // Conditional formatting
+        function getCellStyle(value, colIdx, rules) {
+            if (!rules || !rules.length) return '';
+            var styles = {};
+            for (var i = 0; i < rules.length; i++) {
+                var rule = rules[i];
+                if (parseInt(rule.colIdx, 10) !== colIdx) continue;
+                if (matchesRule(value, rule)) {
+                    if (rule.style) {
+                        if (rule.style.bg) styles['background-color'] = rule.style.bg;
+                        if (rule.style.color) styles['color'] = rule.style.color;
+                        if (rule.style.bold) styles['font-weight'] = 'bold';
+                    }
+                }
+            }
+            var parts = [];
+            for (var key in styles) {
+                if (styles.hasOwnProperty(key)) parts.push(key + ':' + styles[key]);
+            }
+            return parts.join(';');
+        }
+
+        function matchesRule(value, rule) {
+            var op = rule.operator;
+            var rv = rule.value;
+            if (op === 'contains') return String(value).toLowerCase().indexOf(String(rv).toLowerCase()) !== -1;
+            if (op === 'empty') return value === '' || value === null || value === undefined;
+            if (op === 'not_empty') return value !== '' && value !== null && value !== undefined;
+            var nv = parseFloat(value), nr = parseFloat(rv);
+            if (isNaN(nv) || isNaN(nr)) {
+                if (op === '==') return String(value) === String(rv);
+                if (op === '!=') return String(value) !== String(rv);
+                return false;
+            }
+            switch (op) {
+                case '>': return nv > nr;
+                case '<': return nv < nr;
+                case '>=': return nv >= nr;
+                case '<=': return nv <= nr;
+                case '==': return nv === nr;
+                case '!=': return nv !== nr;
+                case 'between':
+                    var nr2 = parseFloat(rule.value2);
+                    return !isNaN(nr2) && nv >= nr && nv <= nr2;
+                default: return false;
+            }
+        }
+
+        // Pagination
+        function renderPagination() {
+            if (!paginationEl) return;
+            var totalPages = Math.ceil(filteredRows.length / rowsPerPage) || 1;
+
+            if (totalPages <= 1) {
+                paginationEl.innerHTML = '';
+                return;
+            }
+
+            var html = '<div class="litestats-page-info">' +
+                'Page ' + currentPage + ' of ' + totalPages +
+                ' (' + filteredRows.length + ' rows)' +
+            '</div>';
+            html += '<div class="litestats-page-btns">';
+            html += '<button class="litestats-btn litestats-page-prev"' + (currentPage <= 1 ? ' disabled' : '') + '>&laquo; Prev</button>';
+
+            // Page numbers (max 7)
+            var startPage = Math.max(1, currentPage - 3);
+            var endPage = Math.min(totalPages, startPage + 6);
+            if (endPage - startPage < 6) startPage = Math.max(1, endPage - 6);
+
+            for (var p = startPage; p <= endPage; p++) {
+                html += '<button class="litestats-btn litestats-page-num' + (p === currentPage ? ' active' : '') + '" data-page="' + p + '">' + p + '</button>';
+            }
+
+            html += '<button class="litestats-btn litestats-page-next"' + (currentPage >= totalPages ? ' disabled' : '') + '>Next &raquo;</button>';
+            html += '</div>';
+
+            paginationEl.innerHTML = html;
+
+            // Bind
+            paginationEl.querySelector('.litestats-page-prev').addEventListener('click', function() {
+                if (currentPage > 1) { currentPage--; renderBody(); renderPagination(); }
+            });
+            paginationEl.querySelector('.litestats-page-next').addEventListener('click', function() {
+                if (currentPage < totalPages) { currentPage++; renderBody(); renderPagination(); }
+            });
+            paginationEl.querySelectorAll('.litestats-page-num').forEach(function(btn) {
+                btn.addEventListener('click', function() {
+                    currentPage = parseInt(this.dataset.page, 10);
+                    renderBody();
+                    renderPagination();
+                });
+            });
+        }
+
+        // Search
+        function bindSearch() {
+            var searchInput = tableWrapper.querySelector('.litestats-search');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    searchTerm = this.value.toLowerCase();
+                    applyFilters();
+                    applySort();
+                    currentPage = 1;
+                    renderBody();
+                    renderPagination();
+                });
+            }
+        }
+
+        // Export CSV
+        function bindExport() {
+            var exportBtn = tableWrapper.querySelector('.litestats-export-csv');
+            if (exportBtn) {
+                exportBtn.addEventListener('click', function() {
+                    var csv = '';
+                    // Header
+                    csv += cols.map(function(c) { return '"' + c.name.replace(/"/g, '""') + '"'; }).join(',') + '\n';
+                    // Rows (filtered)
+                    filteredRows.forEach(function(row) {
+                        csv += row.map(function(cell) {
+                            return '"' + String(cell).replace(/"/g, '""') + '"';
+                        }).join(',') + '\n';
+                    });
+
+                    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    var url = URL.createObjectURL(blob);
+                    var link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'litestats-export.csv';
+                    link.click();
+                    URL.revokeObjectURL(url);
+                });
+            }
+
+            var printBtn = tableWrapper.querySelector('.litestats-print');
+            if (printBtn) {
+                printBtn.addEventListener('click', function() {
+                    var printWin = window.open('', '_blank');
+                    var html = '<html><head><title>Print</title><style>' +
+                        'table{border-collapse:collapse;width:100%}th,td{border:1px solid #ddd;padding:8px;text-align:left}' +
+                        'th{background:#f8f9fa;font-weight:600}tr:nth-child(even){background:#f9f9f9}' +
+                        '</style></head><body>';
+                    html += table.outerHTML;
+                    html += '</body></html>';
+                    printWin.document.write(html);
+                    printWin.document.close();
+                    printWin.print();
+                });
+            }
+        }
+
+        // Init
+        renderHeaders();
+        renderColumnFilters();
+        applyFilters();
+        applySort();
+        renderBody();
+        renderPagination();
+        bindSearch();
+        bindExport();
     }
 
     /**

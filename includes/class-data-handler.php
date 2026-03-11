@@ -2,8 +2,7 @@
 /**
  * Data Handler Class.
  *
- * Handles all Custom Post Type registration and CRUD operations
- * for chart data storage.
+ * Handles all CRUD operations for chart data using a custom database table.
  *
  * @package LiteStats\Pro
  * @since   5.0.0
@@ -26,333 +25,219 @@ if ( ! defined( 'ABSPATH' ) ) {
 class DataHandler {
 
     /**
-     * Custom Post Type name.
+     * Get the table name.
      *
-     * @var string
+     * @return string
      */
-    public const POST_TYPE = 'litestats_chart';
-
-    /**
-     * Meta key for chart configuration.
-     *
-     * @var string
-     */
-    public const META_KEY_CONFIG = '_litestats_chart_config';
-
-    /**
-     * Meta key for chart settings.
-     *
-     * @var string
-     */
-    public const META_KEY_SETTINGS = '_litestats_chart_settings';
-
-    /**
-     * Constructor.
-     *
-     * @since 5.0.0
-     */
-    public function __construct() {
-        $this->init_hooks();
-    }
-
-    /**
-     * Initialize hooks.
-     *
-     * @since 5.0.0
-     */
-    private function init_hooks(): void {
-        add_action( 'init', [ $this, 'register_post_type' ] );
-    }
-
-    /**
-     * Register the custom post type.
-     *
-     * @since 5.0.0
-     */
-    public function register_post_type(): void {
-        $labels = [
-            'name'               => _x( 'LiteStats Charts', 'post type general name', 'litestats-pro' ),
-            'singular_name'      => _x( 'LiteStats Chart', 'post type singular name', 'litestats-pro' ),
-            'menu_name'          => _x( 'LiteStats Charts', 'admin menu', 'litestats-pro' ),
-            'add_new'            => _x( 'Add New', 'chart', 'litestats-pro' ),
-            'add_new_item'       => __( 'Add New Chart', 'litestats-pro' ),
-            'edit_item'          => __( 'Edit Chart', 'litestats-pro' ),
-            'new_item'           => __( 'New Chart', 'litestats-pro' ),
-            'view_item'          => __( 'View Chart', 'litestats-pro' ),
-            'search_items'       => __( 'Search Charts', 'litestats-pro' ),
-            'not_found'          => __( 'No charts found', 'litestats-pro' ),
-            'not_found_in_trash' => __( 'No charts found in Trash', 'litestats-pro' ),
-        ];
-
-        $args = [
-            'labels'              => $labels,
-            'public'              => false,
-            'publicly_queryable'  => false,
-            'show_ui'             => false,
-            'show_in_menu'        => false,
-            'show_in_nav_menus'   => false,
-            'show_in_admin_bar'   => false,
-            'show_in_rest'        => false,
-            'exclude_from_search' => true,
-            'query_var'           => false,
-            'rewrite'             => false,
-            'capability_type'     => 'post',
-            'has_archive'         => false,
-            'hierarchical'        => false,
-            'supports'            => [ 'title' ],
-            'menu_icon'           => 'dashicons-chart-bar',
-        ];
-
-        register_post_type( self::POST_TYPE, $args );
+    private function table_name(): string {
+        global $wpdb;
+        return $wpdb->prefix . 'litestats_charts';
     }
 
     /**
      * Create a new chart.
      *
-     * @since 5.0.0
-     *
-     * @param string $title  Chart title.
-     * @param array  $config Chart configuration data (cols, rows).
+     * @param string $title    Chart title.
+     * @param array  $config   Chart configuration data (cols, rows).
      * @param array  $settings Chart settings (chartType, theme, etc.).
-     * @return int|false Post ID on success, false on failure.
+     * @return int|false New chart ID on success, false on failure.
      */
     public function create_chart( string $title, array $config = [], array $settings = [] ) {
-        // Validate user permission.
+        global $wpdb;
+
         if ( ! current_user_can( 'manage_options' ) ) {
             return false;
         }
 
-        // Sanitize title.
         $title = sanitize_text_field( $title );
         if ( empty( $title ) ) {
             $title = __( 'Untitled Chart', 'litestats-pro' );
         }
 
-        // Create post.
-        $post_id = wp_insert_post(
+        $sanitized_config   = $this->sanitize_config( $config );
+        $sanitized_settings = $this->sanitize_settings( $settings );
+
+        $result = $wpdb->insert(
+            $this->table_name(),
             [
-                'post_type'   => self::POST_TYPE,
-                'post_title'  => $title,
-                'post_status' => 'publish',
+                'title'    => $title,
+                'config'   => wp_json_encode( $sanitized_config ),
+                'settings' => wp_json_encode( $sanitized_settings ),
             ],
-            true
+            [ '%s', '%s', '%s' ]
         );
 
-        if ( is_wp_error( $post_id ) ) {
+        if ( false === $result ) {
             return false;
         }
 
-        // Save configuration.
-        $this->update_chart_config( $post_id, $config );
-        $this->update_chart_settings( $post_id, $settings );
-
-        return $post_id;
+        return (int) $wpdb->insert_id;
     }
 
     /**
      * Get a chart by ID.
      *
-     * @since 5.0.0
-     *
-     * @param int $chart_id Chart post ID.
+     * @param int $chart_id Chart ID.
      * @return array|null Chart data or null if not found.
      */
     public function get_chart( int $chart_id ): ?array {
-        $post = get_post( $chart_id );
+        global $wpdb;
 
-        if ( ! $post || self::POST_TYPE !== $post->post_type ) {
+        $row = $wpdb->get_row(
+            $wpdb->prepare(
+                "SELECT * FROM {$this->table_name()} WHERE id = %d",
+                $chart_id
+            )
+        );
+
+        if ( ! $row ) {
             return null;
         }
 
-        return [
-            'id'       => $post->ID,
-            'title'    => $post->post_title,
-            'config'   => $this->get_chart_config( $chart_id ),
-            'settings' => $this->get_chart_settings( $chart_id ),
-            'created'  => $post->post_date,
-            'modified' => $post->post_modified,
-        ];
+        return $this->hydrate( $row );
     }
 
     /**
      * Update a chart.
      *
-     * @since 5.0.0
-     *
-     * @param int    $chart_id Chart post ID.
+     * @param int    $chart_id Chart ID.
      * @param string $title    Chart title.
      * @param array  $config   Chart configuration data.
      * @param array  $settings Chart settings.
      * @return bool True on success, false on failure.
      */
     public function update_chart( int $chart_id, string $title = '', array $config = [], array $settings = [] ): bool {
-        // Validate user permission.
+        global $wpdb;
+
         if ( ! current_user_can( 'manage_options' ) ) {
             return false;
         }
 
         // Verify chart exists.
-        $post = get_post( $chart_id );
-        if ( ! $post || self::POST_TYPE !== $post->post_type ) {
+        $existing = $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT id FROM {$this->table_name()} WHERE id = %d",
+                $chart_id
+            )
+        );
+
+        if ( ! $existing ) {
             return false;
         }
 
-        // Update title if provided.
+        $data    = [];
+        $formats = [];
+
         if ( ! empty( $title ) ) {
-            wp_update_post(
-                [
-                    'ID'         => $chart_id,
-                    'post_title' => sanitize_text_field( $title ),
-                ]
-            );
+            $data['title'] = sanitize_text_field( $title );
+            $formats[]     = '%s';
         }
 
-        // Update configuration.
         if ( ! empty( $config ) ) {
-            $this->update_chart_config( $chart_id, $config );
+            $data['config'] = wp_json_encode( $this->sanitize_config( $config ) );
+            $formats[]      = '%s';
         }
 
-        // Update settings.
         if ( ! empty( $settings ) ) {
-            $this->update_chart_settings( $chart_id, $settings );
+            $data['settings'] = wp_json_encode( $this->sanitize_settings( $settings ) );
+            $formats[]        = '%s';
         }
 
-        return true;
-    }
-
-    /**
-     * Delete a chart.
-     *
-     * @since 5.0.0
-     *
-     * @param int $chart_id Chart post ID.
-     * @return bool True on success, false on failure.
-     */
-    public function delete_chart( int $chart_id ): bool {
-        // Validate user permission.
-        if ( ! current_user_can( 'manage_options' ) ) {
-            return false;
+        if ( empty( $data ) ) {
+            return true;
         }
 
-        // Verify chart exists.
-        $post = get_post( $chart_id );
-        if ( ! $post || self::POST_TYPE !== $post->post_type ) {
-            return false;
-        }
-
-        // Delete permanently.
-        $result = wp_delete_post( $chart_id, true );
+        $result = $wpdb->update(
+            $this->table_name(),
+            $data,
+            [ 'id' => $chart_id ],
+            $formats,
+            [ '%d' ]
+        );
 
         return false !== $result;
     }
 
     /**
+     * Delete a chart.
+     *
+     * @param int $chart_id Chart ID.
+     * @return bool True on success, false on failure.
+     */
+    public function delete_chart( int $chart_id ): bool {
+        global $wpdb;
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            return false;
+        }
+
+        $result = $wpdb->delete(
+            $this->table_name(),
+            [ 'id' => $chart_id ],
+            [ '%d' ]
+        );
+
+        return false !== $result && $result > 0;
+    }
+
+    /**
      * Get all charts.
      *
-     * @since 5.0.0
-     *
-     * @param array $args Query arguments.
+     * @param array $args Query arguments (unused, kept for compat).
      * @return array Array of chart data.
      */
     public function get_all_charts( array $args = [] ): array {
-        $defaults = [
-            'post_type'      => self::POST_TYPE,
-            'post_status'    => 'publish',
-            'posts_per_page' => -1,
-            'orderby'        => 'date',
-            'order'          => 'DESC',
-        ];
+        global $wpdb;
 
-        $query_args = wp_parse_args( $args, $defaults );
-        $posts      = get_posts( $query_args );
-        $charts     = [];
+        $rows = $wpdb->get_results(
+            "SELECT * FROM {$this->table_name()} ORDER BY updated_at DESC"
+        );
 
-        foreach ( $posts as $post ) {
-            $charts[] = [
-                'id'       => $post->ID,
-                'title'    => $post->post_title,
-                'config'   => $this->get_chart_config( $post->ID ),
-                'settings' => $this->get_chart_settings( $post->ID ),
-                'created'  => $post->post_date,
-                'modified' => $post->post_modified,
-            ];
+        if ( ! $rows ) {
+            return [];
+        }
+
+        $charts = [];
+        foreach ( $rows as $row ) {
+            $charts[] = $this->hydrate( $row );
         }
 
         return $charts;
     }
 
     /**
-     * Get chart configuration.
+     * Hydrate a DB row into a chart array.
      *
-     * @since 5.0.0
-     *
-     * @param int $chart_id Chart post ID.
-     * @return array Chart configuration.
+     * @param object $row Database row.
+     * @return array Chart data.
      */
-    public function get_chart_config( int $chart_id ): array {
-        $config = get_post_meta( $chart_id, self::META_KEY_CONFIG, true );
+    private function hydrate( object $row ): array {
+        $config  = json_decode( $row->config, true );
+        $settings = json_decode( $row->settings, true );
 
-        if ( empty( $config ) || ! is_array( $config ) ) {
-            return $this->get_default_config();
+        if ( ! is_array( $config ) || empty( $config ) ) {
+            $config = $this->get_default_config();
         }
 
-        return $config;
-    }
-
-    /**
-     * Update chart configuration.
-     *
-     * @since 5.0.0
-     *
-     * @param int   $chart_id Chart post ID.
-     * @param array $config   Chart configuration.
-     * @return bool True on success, false on failure.
-     */
-    public function update_chart_config( int $chart_id, array $config ): bool {
-        // Sanitize configuration.
-        $sanitized = $this->sanitize_config( $config );
-
-        return (bool) update_post_meta( $chart_id, self::META_KEY_CONFIG, $sanitized );
-    }
-
-    /**
-     * Get chart settings.
-     *
-     * @since 5.0.0
-     *
-     * @param int $chart_id Chart post ID.
-     * @return array Chart settings.
-     */
-    public function get_chart_settings( int $chart_id ): array {
-        $settings = get_post_meta( $chart_id, self::META_KEY_SETTINGS, true );
-
-        if ( empty( $settings ) || ! is_array( $settings ) ) {
-            return $this->get_default_settings();
+        $default_settings = $this->get_default_settings();
+        if ( ! is_array( $settings ) || empty( $settings ) ) {
+            $settings = $default_settings;
+        } else {
+            $settings = array_merge( $default_settings, $settings );
         }
 
-        return $settings;
-    }
-
-    /**
-     * Update chart settings.
-     *
-     * @since 5.0.0
-     *
-     * @param int   $chart_id Chart post ID.
-     * @param array $settings Chart settings.
-     * @return bool True on success, false on failure.
-     */
-    public function update_chart_settings( int $chart_id, array $settings ): bool {
-        // Sanitize settings.
-        $sanitized = $this->sanitize_settings( $settings );
-
-        return (bool) update_post_meta( $chart_id, self::META_KEY_SETTINGS, $sanitized );
+        return [
+            'id'       => (int) $row->id,
+            'title'    => $row->title,
+            'config'   => $config,
+            'settings' => $settings,
+            'created'  => $row->created_at,
+            'modified' => $row->updated_at,
+        ];
     }
 
     /**
      * Get default configuration.
-     *
-     * @since 5.0.0
      *
      * @return array Default configuration.
      */
@@ -400,32 +285,45 @@ class DataHandler {
     /**
      * Get default settings.
      *
-     * @since 5.0.0
-     *
      * @return array Default settings.
      */
     public function get_default_settings(): array {
         return [
-            'chartType' => 'bar',
-            'theme'     => 'default',
-            'stacked'   => false,
-            'view'      => 'chart',
-            'mode'      => 'value',
+            'chartType'        => 'bar',
+            'theme'            => 'default',
+            'stacked'          => false,
+            'view'             => 'chart',
+            'mode'             => 'value',
+            'chartLabelCol'    => 0,
+            'chartDataCols'    => [],
+            'xAxisLabel'       => '',
+            'yAxisLabel'       => '',
+            'legendPosition'   => 'top',
+            'showDataLabels'   => false,
+            'seriesColors'     => (object) [],
+            'tableRowsPerPage' => 25,
+            'tableShowSearch'  => true,
+            'tableShowExport'  => true,
+            'tableColumnFilters' => false,
+            'tableStriped'     => true,
+            'conditionalRules' => [],
+            'fillArea'         => false,
+            'lineTension'      => 0.4,
+            'beginAtZero'      => true,
         ];
     }
 
     /**
      * Sanitize configuration data.
      *
-     * @since 5.0.0
-     *
      * @param array $config Configuration to sanitize.
      * @return array Sanitized configuration.
      */
-    private function sanitize_config( array $config ): array {
+    public function sanitize_config( array $config ): array {
         $sanitized = [];
 
-        // Sanitize columns.
+        $valid_types = [ 'string', 'number', 'formula', 'date', 'currency', 'percentage' ];
+
         if ( isset( $config['cols'] ) && is_array( $config['cols'] ) ) {
             $sanitized['cols'] = [];
             foreach ( $config['cols'] as $col ) {
@@ -435,7 +333,7 @@ class DataHandler {
                 $sanitized['cols'][] = [
                     'id'      => isset( $col['id'] ) ? sanitize_key( $col['id'] ) : '',
                     'name'    => isset( $col['name'] ) ? sanitize_text_field( $col['name'] ) : '',
-                    'type'    => isset( $col['type'] ) && in_array( $col['type'], [ 'string', 'number', 'formula' ], true )
+                    'type'    => isset( $col['type'] ) && in_array( $col['type'], $valid_types, true )
                         ? $col['type']
                         : 'string',
                     'formula' => isset( $col['formula'] ) ? sanitize_text_field( $col['formula'] ) : '',
@@ -447,7 +345,6 @@ class DataHandler {
             }
         }
 
-        // Sanitize rows.
         if ( isset( $config['rows'] ) && is_array( $config['rows'] ) ) {
             $sanitized['rows'] = [];
             foreach ( $config['rows'] as $row ) {
@@ -457,7 +354,7 @@ class DataHandler {
                 $sanitized['rows'][] = array_map(
                     function ( $cell ) {
                         if ( is_numeric( $cell ) ) {
-                            return $cell + 0; // Keep as number.
+                            return $cell + 0;
                         }
                         return sanitize_text_field( (string) $cell );
                     },
@@ -472,40 +369,82 @@ class DataHandler {
     /**
      * Sanitize settings data.
      *
-     * @since 5.0.0
-     *
      * @param array $settings Settings to sanitize.
      * @return array Sanitized settings.
      */
-    private function sanitize_settings( array $settings ): array {
+    public function sanitize_settings( array $settings ): array {
+        $defaults  = $this->get_default_settings();
         $sanitized = [];
 
         // Chart type.
-        $valid_chart_types = [ 'bar', 'line', 'pie', 'radar', 'combo' ];
-        $sanitized['chartType'] = isset( $settings['chartType'] ) && in_array( $settings['chartType'], $valid_chart_types, true )
+        $valid_chart_types        = [ 'bar', 'line', 'pie', 'radar', 'combo', 'doughnut' ];
+        $sanitized['chartType']   = isset( $settings['chartType'] ) && in_array( $settings['chartType'], $valid_chart_types, true )
             ? $settings['chartType']
-            : 'bar';
+            : $defaults['chartType'];
 
         // Theme.
-        $valid_themes = [ 'default', 'modern', 'pastel', 'dark' ];
-        $sanitized['theme'] = isset( $settings['theme'] ) && in_array( $settings['theme'], $valid_themes, true )
+        $valid_themes           = [ 'default', 'modern', 'pastel', 'dark' ];
+        $sanitized['theme']     = isset( $settings['theme'] ) && in_array( $settings['theme'], $valid_themes, true )
             ? $settings['theme']
-            : 'default';
+            : $defaults['theme'];
 
-        // Stacked.
-        $sanitized['stacked'] = isset( $settings['stacked'] ) ? (bool) $settings['stacked'] : false;
+        // Booleans.
+        $sanitized['stacked']          = isset( $settings['stacked'] ) ? (bool) $settings['stacked'] : $defaults['stacked'];
+        $sanitized['showDataLabels']   = isset( $settings['showDataLabels'] ) ? (bool) $settings['showDataLabels'] : $defaults['showDataLabels'];
+        $sanitized['tableShowSearch']  = isset( $settings['tableShowSearch'] ) ? (bool) $settings['tableShowSearch'] : $defaults['tableShowSearch'];
+        $sanitized['tableShowExport']  = isset( $settings['tableShowExport'] ) ? (bool) $settings['tableShowExport'] : $defaults['tableShowExport'];
+        $sanitized['tableColumnFilters'] = isset( $settings['tableColumnFilters'] ) ? (bool) $settings['tableColumnFilters'] : $defaults['tableColumnFilters'];
+        $sanitized['tableStriped']     = isset( $settings['tableStriped'] ) ? (bool) $settings['tableStriped'] : $defaults['tableStriped'];
+        $sanitized['fillArea']         = isset( $settings['fillArea'] ) ? (bool) $settings['fillArea'] : $defaults['fillArea'];
+        $sanitized['beginAtZero']      = isset( $settings['beginAtZero'] ) ? (bool) $settings['beginAtZero'] : $defaults['beginAtZero'];
 
         // View.
-        $valid_views = [ 'chart', 'table' ];
-        $sanitized['view'] = isset( $settings['view'] ) && in_array( $settings['view'], $valid_views, true )
+        $valid_views          = [ 'chart', 'table' ];
+        $sanitized['view']    = isset( $settings['view'] ) && in_array( $settings['view'], $valid_views, true )
             ? $settings['view']
-            : 'chart';
+            : $defaults['view'];
 
         // Mode.
-        $valid_modes = [ 'value', 'percent' ];
-        $sanitized['mode'] = isset( $settings['mode'] ) && in_array( $settings['mode'], $valid_modes, true )
+        $valid_modes          = [ 'value', 'percent' ];
+        $sanitized['mode']    = isset( $settings['mode'] ) && in_array( $settings['mode'], $valid_modes, true )
             ? $settings['mode']
-            : 'value';
+            : $defaults['mode'];
+
+        // Chart column selector.
+        $sanitized['chartLabelCol']  = isset( $settings['chartLabelCol'] ) ? absint( $settings['chartLabelCol'] ) : $defaults['chartLabelCol'];
+        $sanitized['chartDataCols']  = isset( $settings['chartDataCols'] ) && is_array( $settings['chartDataCols'] )
+            ? array_map( 'absint', $settings['chartDataCols'] )
+            : $defaults['chartDataCols'];
+
+        // Strings.
+        $sanitized['xAxisLabel']     = isset( $settings['xAxisLabel'] ) ? sanitize_text_field( $settings['xAxisLabel'] ) : $defaults['xAxisLabel'];
+        $sanitized['yAxisLabel']     = isset( $settings['yAxisLabel'] ) ? sanitize_text_field( $settings['yAxisLabel'] ) : $defaults['yAxisLabel'];
+
+        // Legend position.
+        $valid_positions                = [ 'top', 'bottom', 'left', 'right' ];
+        $sanitized['legendPosition']    = isset( $settings['legendPosition'] ) && in_array( $settings['legendPosition'], $valid_positions, true )
+            ? $settings['legendPosition']
+            : $defaults['legendPosition'];
+
+        // Series colors (object).
+        $sanitized['seriesColors'] = isset( $settings['seriesColors'] ) && ( is_array( $settings['seriesColors'] ) || is_object( $settings['seriesColors'] ) )
+            ? $settings['seriesColors']
+            : $defaults['seriesColors'];
+
+        // Table rows per page.
+        $sanitized['tableRowsPerPage'] = isset( $settings['tableRowsPerPage'] ) ? absint( $settings['tableRowsPerPage'] ) : $defaults['tableRowsPerPage'];
+        if ( $sanitized['tableRowsPerPage'] < 1 ) {
+            $sanitized['tableRowsPerPage'] = 25;
+        }
+
+        // Line tension.
+        $sanitized['lineTension'] = isset( $settings['lineTension'] ) ? (float) $settings['lineTension'] : $defaults['lineTension'];
+        $sanitized['lineTension'] = max( 0, min( 1, $sanitized['lineTension'] ) );
+
+        // Conditional rules.
+        $sanitized['conditionalRules'] = isset( $settings['conditionalRules'] ) && is_array( $settings['conditionalRules'] )
+            ? $settings['conditionalRules']
+            : $defaults['conditionalRules'];
 
         return $sanitized;
     }

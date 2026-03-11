@@ -41,8 +41,6 @@ class Shortcode {
     /**
      * Constructor.
      *
-     * @since 5.0.0
-     *
      * @param DataHandler $data_handler Data handler instance.
      */
     public function __construct( DataHandler $data_handler ) {
@@ -52,8 +50,6 @@ class Shortcode {
 
     /**
      * Initialize hooks.
-     *
-     * @since 5.0.0
      */
     private function init_hooks(): void {
         add_shortcode( 'litestats', [ $this, 'render_shortcode' ] );
@@ -62,18 +58,9 @@ class Shortcode {
 
     /**
      * Add SRI integrity attribute to CDN scripts.
-     *
-     * @since 5.0.0
-     *
-     * @param string $tag    The script tag HTML.
-     * @param string $handle The script handle.
-     * @param string $src    The script source URL.
-     * @return string Modified script tag.
      */
     public function add_script_integrity( string $tag, string $handle, string $src ): string {
-        // Add integrity for Chart.js CDN.
         if ( 'chartjs' === $handle && strpos( $src, 'cdn.jsdelivr.net' ) !== false ) {
-            // SRI hash for Chart.js 4.4.1 UMD build.
             $integrity = 'sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4';
             $tag = str_replace(
                 ' src=',
@@ -85,9 +72,29 @@ class Shortcode {
     }
 
     /**
-     * Render the shortcode.
+     * Resolve chart ID, checking ID map for old CPT IDs.
      *
-     * @since 5.0.0
+     * @param int $chart_id Requested chart ID.
+     * @return int Resolved chart ID.
+     */
+    private function resolve_chart_id( int $chart_id ): int {
+        // Try direct lookup first.
+        $chart = $this->data_handler->get_chart( $chart_id );
+        if ( $chart ) {
+            return $chart_id;
+        }
+
+        // Check ID map for old CPT ID → new table ID.
+        $id_map = get_option( 'litestats_pro_id_map', [] );
+        if ( is_array( $id_map ) && isset( $id_map[ $chart_id ] ) ) {
+            return (int) $id_map[ $chart_id ];
+        }
+
+        return $chart_id;
+    }
+
+    /**
+     * Render the shortcode.
      *
      * @param array|string $atts Shortcode attributes.
      * @return string Rendered HTML.
@@ -95,12 +102,15 @@ class Shortcode {
     public function render_shortcode( $atts ): string {
         $atts = shortcode_atts(
             [
-                'id'     => 0,
-                'type'   => '', // Override chart type.
-                'theme'  => '', // Override theme.
-                'view'   => '', // Override view: 'chart' or 'table'.
-                'width'  => '100%',
-                'height' => '400px',
+                'id'             => 0,
+                'type'           => '',
+                'theme'          => '',
+                'view'           => '',
+                'width'          => '100%',
+                'height'         => '400px',
+                'rows_per_page'  => 0,
+                'show_export'    => '',
+                'show_filters'   => '',
             ],
             $atts,
             'litestats'
@@ -111,6 +121,9 @@ class Shortcode {
         if ( $chart_id <= 0 ) {
             return $this->render_error( __( 'Invalid chart ID.', 'litestats-pro' ) );
         }
+
+        // Resolve ID (handles old CPT IDs via map).
+        $chart_id = $this->resolve_chart_id( $chart_id );
 
         // Get chart data.
         $chart = $this->data_handler->get_chart( $chart_id );
@@ -132,6 +145,15 @@ class Shortcode {
         }
         if ( ! empty( $atts['view'] ) && in_array( $atts['view'], [ 'chart', 'table' ], true ) ) {
             $settings['view'] = $atts['view'];
+        }
+        if ( absint( $atts['rows_per_page'] ) > 0 ) {
+            $settings['tableRowsPerPage'] = absint( $atts['rows_per_page'] );
+        }
+        if ( '' !== $atts['show_export'] ) {
+            $settings['tableShowExport'] = filter_var( $atts['show_export'], FILTER_VALIDATE_BOOLEAN );
+        }
+        if ( '' !== $atts['show_filters'] ) {
+            $settings['tableColumnFilters'] = filter_var( $atts['show_filters'], FILTER_VALIDATE_BOOLEAN );
         }
 
         // Generate unique ID for this chart instance.
@@ -158,14 +180,28 @@ class Shortcode {
 
         ob_start();
         ?>
-        <div class="litestats-container" id="<?php echo esc_attr( $instance_id ); ?>" style="width: <?php echo $width; ?>; height: <?php echo $height; ?>;">
+        <div class="litestats-container" id="<?php echo esc_attr( $instance_id ); ?>" style="width: <?php echo $width; ?>; <?php echo 'table' !== $settings['view'] ? 'height: ' . $height . ';' : ''; ?>">
             <?php if ( 'table' === $settings['view'] ) : ?>
                 <div class="litestats-table-wrapper">
-                    <input type="text" class="litestats-search" placeholder="<?php esc_attr_e( 'Search...', 'litestats-pro' ); ?>" data-target="<?php echo esc_attr( $instance_id ); ?>">
-                    <table class="litestats-table">
+                    <div class="litestats-table-toolbar">
+                        <?php if ( $settings['tableShowSearch'] ) : ?>
+                            <input type="text" class="litestats-search" placeholder="<?php esc_attr_e( 'Search...', 'litestats-pro' ); ?>" data-target="<?php echo esc_attr( $instance_id ); ?>">
+                        <?php endif; ?>
+                        <?php if ( $settings['tableShowExport'] ) : ?>
+                            <div class="litestats-export-bar">
+                                <button class="litestats-btn litestats-export-csv" data-target="<?php echo esc_attr( $instance_id ); ?>"><?php esc_html_e( 'Export CSV', 'litestats-pro' ); ?></button>
+                                <button class="litestats-btn litestats-print" data-target="<?php echo esc_attr( $instance_id ); ?>"><?php esc_html_e( 'Print', 'litestats-pro' ); ?></button>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                    <?php if ( $settings['tableColumnFilters'] ) : ?>
+                        <div class="litestats-column-filters"></div>
+                    <?php endif; ?>
+                    <table class="litestats-table<?php echo $settings['tableStriped'] ? ' litestats-striped' : ''; ?>">
                         <thead></thead>
                         <tbody></tbody>
                     </table>
+                    <div class="litestats-pagination"></div>
                 </div>
             <?php else : ?>
                 <canvas class="litestats-canvas"></canvas>
@@ -177,17 +213,12 @@ class Shortcode {
 
     /**
      * Enqueue frontend assets.
-     *
-     * Only loads when shortcode is present on the page.
-     *
-     * @since 5.0.0
      */
     private function enqueue_frontend_assets(): void {
         if ( $this->assets_enqueued ) {
             return;
         }
 
-        // Enqueue Chart.js.
         wp_enqueue_script(
             'chartjs',
             'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
@@ -196,7 +227,6 @@ class Shortcode {
             true
         );
 
-        // Enqueue frontend styles.
         wp_enqueue_style(
             'litestats-pro-frontend',
             LITESTATS_PRO_PLUGIN_URL . 'assets/css/frontend-style.css',
@@ -204,7 +234,6 @@ class Shortcode {
             LITESTATS_PRO_VERSION
         );
 
-        // Enqueue frontend app.
         wp_enqueue_script(
             'litestats-pro-frontend',
             LITESTATS_PRO_PLUGIN_URL . 'assets/js/frontend-app.js',
@@ -213,14 +242,22 @@ class Shortcode {
             true
         );
 
-        // Localize script.
         wp_localize_script(
             'litestats-pro-frontend',
             'liteStatsProFrontend',
             [
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
                 'strings' => [
-                    'noData' => __( 'No data available', 'litestats-pro' ),
+                    'noData'    => __( 'No data available', 'litestats-pro' ),
+                    'page'      => __( 'Page', 'litestats-pro' ),
+                    'of'        => __( 'of', 'litestats-pro' ),
+                    'prev'      => __( 'Previous', 'litestats-pro' ),
+                    'next'      => __( 'Next', 'litestats-pro' ),
+                    'exportCsv' => __( 'Export CSV', 'litestats-pro' ),
+                    'print'     => __( 'Print', 'litestats-pro' ),
+                    'all'       => __( 'All', 'litestats-pro' ),
+                    'min'       => __( 'Min', 'litestats-pro' ),
+                    'max'       => __( 'Max', 'litestats-pro' ),
                 ],
             ]
         );
@@ -231,13 +268,10 @@ class Shortcode {
     /**
      * Render error message.
      *
-     * @since 5.0.0
-     *
      * @param string $message Error message.
      * @return string Rendered error HTML.
      */
     private function render_error( string $message ): string {
-        // Only show detailed errors to admins.
         if ( current_user_can( 'manage_options' ) ) {
             return sprintf(
                 '<div class="litestats-error" style="padding: 20px; background: #fef1f1; border: 1px solid #d63638; border-radius: 4px; color: #d63638;">%s</div>',

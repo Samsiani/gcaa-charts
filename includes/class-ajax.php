@@ -34,8 +34,6 @@ class Ajax {
     /**
      * Constructor.
      *
-     * @since 5.0.0
-     *
      * @param DataHandler $data_handler Data handler instance.
      */
     public function __construct( DataHandler $data_handler ) {
@@ -45,32 +43,20 @@ class Ajax {
 
     /**
      * Initialize hooks.
-     *
-     * @since 5.0.0
      */
     private function init_hooks(): void {
-        // Save chart.
         add_action( 'wp_ajax_litestats_save_chart', [ $this, 'save_chart' ] );
-
-        // Load chart.
         add_action( 'wp_ajax_litestats_load_chart', [ $this, 'load_chart' ] );
-
-        // Delete chart.
         add_action( 'wp_ajax_litestats_delete_chart', [ $this, 'delete_chart' ] );
-
-        // Get all charts.
         add_action( 'wp_ajax_litestats_get_charts', [ $this, 'get_charts' ] );
     }
 
     /**
      * Verify AJAX request security.
      *
-     * @since 5.0.0
-     *
      * @return bool True if valid, dies with error otherwise.
      */
     private function verify_request(): bool {
-        // Verify nonce.
         if ( ! check_ajax_referer( 'litestats_pro_nonce', 'nonce', false ) ) {
             wp_send_json_error(
                 [
@@ -82,7 +68,6 @@ class Ajax {
             return false;
         }
 
-        // Verify user capability.
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error(
                 [
@@ -99,22 +84,18 @@ class Ajax {
 
     /**
      * Save chart AJAX handler.
-     *
-     * @since 5.0.0
      */
     public function save_chart(): void {
         $this->verify_request();
 
-        // Get and validate input.
         $chart_id = isset( $_POST['chart_id'] ) ? absint( $_POST['chart_id'] ) : 0;
         $title    = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
 
-        // Parse JSON data.
         $config   = [];
         $settings = [];
 
         if ( isset( $_POST['config'] ) ) {
-            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON requires raw data, sanitized after decode
+            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
             $config_json = wp_unslash( $_POST['config'] );
             $config      = json_decode( $config_json, true );
 
@@ -131,7 +112,7 @@ class Ajax {
         }
 
         if ( isset( $_POST['settings'] ) ) {
-            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- JSON requires raw data, sanitized after decode
+            // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
             $settings_json = wp_unslash( $_POST['settings'] );
             $settings      = json_decode( $settings_json, true );
 
@@ -147,9 +128,7 @@ class Ajax {
             }
         }
 
-        // Create or update.
         if ( $chart_id > 0 ) {
-            // Update existing chart.
             $result = $this->data_handler->update_chart( $chart_id, $title, $config, $settings );
 
             if ( $result ) {
@@ -169,7 +148,6 @@ class Ajax {
                 );
             }
         } else {
-            // Create new chart.
             $new_id = $this->data_handler->create_chart( $title, $config, $settings );
 
             if ( $new_id ) {
@@ -193,8 +171,6 @@ class Ajax {
 
     /**
      * Load chart AJAX handler.
-     *
-     * @since 5.0.0
      */
     public function load_chart(): void {
         $this->verify_request();
@@ -229,8 +205,6 @@ class Ajax {
 
     /**
      * Delete chart AJAX handler.
-     *
-     * @since 5.0.0
      */
     public function delete_chart(): void {
         $this->verify_request();
@@ -269,8 +243,6 @@ class Ajax {
 
     /**
      * Get all charts AJAX handler.
-     *
-     * @since 5.0.0
      */
     public function get_charts(): void {
         $this->verify_request();
