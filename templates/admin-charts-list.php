@@ -86,8 +86,11 @@ if ( ! defined( 'ABSPATH' ) ) {
                             </div>
                         </td>
                         <td class="column-shortcode">
-                            <code class="litestats-shortcode-copy" title="<?php esc_attr_e( 'Click to copy', 'litestats-pro' ); ?>">
-                                [litestats id="<?php echo esc_attr( $chart['id'] ); ?>"]
+                            <code class="litestats-shortcode-copy" title="<?php esc_attr_e( 'Click to copy', 'litestats-pro' ); ?>" data-sc='[litestats id="<?php echo esc_attr( $chart['id'] ); ?>" view="chart"]'>
+                                <i class="fas fa-chart-bar"></i> chart
+                            </code>
+                            <code class="litestats-shortcode-copy" title="<?php esc_attr_e( 'Click to copy', 'litestats-pro' ); ?>" data-sc='[litestats id="<?php echo esc_attr( $chart['id'] ); ?>" view="table"]'>
+                                <i class="fas fa-table"></i> table
                             </code>
                         </td>
                         <td class="column-type">
@@ -114,8 +117,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Copy shortcode on click.
     document.querySelectorAll('.litestats-shortcode-copy').forEach(function(el) {
         el.addEventListener('click', function() {
-            navigator.clipboard.writeText(this.textContent.trim()).then(function() {
-                alert('<?php echo esc_js( __( 'Shortcode copied to clipboard!', 'litestats-pro' ) ); ?>');
+            var sc = this.dataset.sc || this.textContent.trim();
+            navigator.clipboard.writeText(sc).then(function() {
+                alert('<?php echo esc_js( __( 'Copied!', 'litestats-pro' ) ); ?> ' + sc);
             });
         });
     });

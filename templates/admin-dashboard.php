@@ -28,11 +28,18 @@ $page_title  = $is_new ? __( 'Add New Chart', 'litestats-pro' ) : __( 'Edit Char
             <i class="fas fa-cube"></i>
             LiteStats <span>PRO v5</span>
         </div>
-        <div class="litestats-sc-badge" id="scCode">
+        <div class="litestats-sc-badges" id="scCode">
             <?php if ( ! $is_new ) : ?>
-                [litestats id="<?php echo esc_attr( $chart_id ); ?>"]
+                <span class="litestats-sc-badge" data-sc='[litestats id="<?php echo esc_attr( $chart_id ); ?>" view="chart"]' title="<?php esc_attr_e( 'Click to copy', 'litestats-pro' ); ?>">
+                    <i class="fas fa-chart-bar"></i> [litestats id="<?php echo esc_attr( $chart_id ); ?>" view="chart"]
+                </span>
+                <span class="litestats-sc-badge" data-sc='[litestats id="<?php echo esc_attr( $chart_id ); ?>" view="table"]' title="<?php esc_attr_e( 'Click to copy', 'litestats-pro' ); ?>">
+                    <i class="fas fa-table"></i> [litestats id="<?php echo esc_attr( $chart_id ); ?>" view="table"]
+                </span>
             <?php else : ?>
-                <?php esc_html_e( 'Save to get shortcode', 'litestats-pro' ); ?>
+                <span class="litestats-sc-badge litestats-sc-badge--placeholder">
+                    <?php esc_html_e( 'Save to get shortcodes', 'litestats-pro' ); ?>
+                </span>
             <?php endif; ?>
         </div>
         <div class="litestats-actions">

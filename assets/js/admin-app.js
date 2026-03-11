@@ -208,6 +208,14 @@
 
             // Frontend table search
             $('#feSearch').on('keyup', function() { self.filterFrontendTable(); });
+
+            // Click-to-copy shortcode badges
+            $(document).on('click', '.litestats-sc-badge[data-sc]', function() {
+                var sc = $(this).data('sc');
+                navigator.clipboard.writeText(sc).then(function() {
+                    self.showToast('Copied: ' + sc);
+                });
+            });
         },
 
         /**
@@ -814,7 +822,15 @@
                             liteStatsProAdmin.chartId = response.data.chart_id;
 
                             // Update shortcode display
-                            $('#scCode').text('[litestats id="' + response.data.chart_id + '"]');
+                            var cid = response.data.chart_id;
+                            $('#scCode').html(
+                                '<span class="litestats-sc-badge" data-sc=\'[litestats id="' + cid + '" view="chart"]\'>' +
+                                    '<i class="fas fa-chart-bar"></i> [litestats id="' + cid + '" view="chart"]' +
+                                '</span>' +
+                                '<span class="litestats-sc-badge" data-sc=\'[litestats id="' + cid + '" view="table"]\'>' +
+                                    '<i class="fas fa-table"></i> [litestats id="' + cid + '" view="table"]' +
+                                '</span>'
+                            );
 
                             // Update URL without reload
                             var newUrl = window.location.href.replace('litestats-pro-new', 'litestats-pro-edit') + 
