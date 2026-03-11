@@ -130,8 +130,8 @@
         var palette = themes[settings.theme] || themes['default'];
         var labelCol = settings.chartLabelCol || 0;
 
-        // When grouping is active and label col is the group col, shift to next column
-        if (typeof settings.groupByCol !== 'undefined' && settings.groupByCol >= 0 && labelCol === settings.groupByCol) {
+        // When a specific group is selected and label col is the group col, shift to next column
+        if (chartData._groupFiltered && labelCol === settings.groupByCol) {
             for (var li = 0; li < cols.length; li++) {
                 if (li !== settings.groupByCol) { labelCol = li; break; }
             }
@@ -667,7 +667,8 @@
                 var filteredData = {
                     id: chartData.id,
                     config: { cols: config.cols, rows: filteredRows },
-                    settings: settings
+                    settings: settings,
+                    _groupFiltered: (group !== '__all__')
                 };
 
                 // Destroy existing chart and re-render
