@@ -240,7 +240,6 @@ class Admin {
                         'redoSuccess'    => __( 'Redo successful', 'litestats-pro' ),
                         'transposed'     => __( 'Table Transposed', 'litestats-pro' ),
                         'csvImported'    => __( 'CSV Imported', 'litestats-pro' ),
-                        'presetSaved'    => __( 'Preset Saved!', 'litestats-pro' ),
                         'selectColumn'   => __( 'Select a column first', 'litestats-pro' ),
                         'cannotDelete'   => __( 'Cannot delete last column', 'litestats-pro' ),
                         'stackingOn'     => __( 'Stacking: ON', 'litestats-pro' ),

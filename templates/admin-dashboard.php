@@ -79,11 +79,7 @@ if ( ! $is_new ) {
                 </button>
                 <button class="btn btn-sm" id="importCsvBtn">
                     <i class="fas fa-file-import"></i>
-                    <?php esc_html_e( 'CSV Import', 'litestats-pro' ); ?>
-                </button>
-                <button class="btn btn-sm" id="savePresetBtn">
-                    <i class="fas fa-bookmark"></i>
-                    <?php esc_html_e( 'Preset', 'litestats-pro' ); ?>
+                    <?php esc_html_e( 'CSV', 'litestats-pro' ); ?>
                 </button>
                 <div class="divider"></div>
 
@@ -140,23 +136,31 @@ if ( ! $is_new ) {
 
         <!-- Right Preview Panel -->
         <div class="litestats-preview-panel">
-            <!-- Visualization Card -->
+            <!-- Title -->
+            <div class="litestats-card litestats-card--compact">
+                <input type="text" class="btn chart-title-input" id="chartTitle"
+                       placeholder="<?php esc_attr_e( 'Chart title...', 'litestats-pro' ); ?>"
+                       value="<?php echo esc_attr( $chart_title ); ?>">
+            </div>
+
+            <!-- Preview Card -->
             <div class="litestats-card">
                 <div class="card-header">
-                    <strong><?php esc_html_e( 'Visualization', 'litestats-pro' ); ?></strong>
                     <div class="toggle-group">
                         <button class="t-btn active" id="viewChart" data-view="chart">
-                            <?php esc_html_e( 'Chart', 'litestats-pro' ); ?>
+                            <i class="fas fa-chart-bar"></i> <?php esc_html_e( 'Chart', 'litestats-pro' ); ?>
                         </button>
                         <button class="t-btn" id="viewTable" data-view="table">
-                            <?php esc_html_e( 'Table', 'litestats-pro' ); ?>
+                            <i class="fas fa-table"></i> <?php esc_html_e( 'Table', 'litestats-pro' ); ?>
                         </button>
                     </div>
+                    <button class="btn btn-sm" id="exportPngBtn" title="<?php esc_attr_e( 'Export PNG', 'litestats-pro' ); ?>">
+                        <i class="fas fa-download"></i>
+                    </button>
                 </div>
 
                 <div class="chart-wrapper">
                     <canvas id="liveChart"></canvas>
-
                     <div id="tablePreviewBox" style="display:none;">
                         <input type="text" class="search-box" id="feSearch"
                                placeholder="<?php esc_attr_e( 'Search data...', 'litestats-pro' ); ?>">
@@ -169,29 +173,22 @@ if ( ! $is_new ) {
 
                 <div class="chart-controls">
                     <select class="btn" id="chartType">
-                        <option value="bar"><?php esc_html_e( 'Bar Chart', 'litestats-pro' ); ?></option>
-                        <option value="line"><?php esc_html_e( 'Line Chart', 'litestats-pro' ); ?></option>
-                        <option value="pie"><?php esc_html_e( 'Pie Chart', 'litestats-pro' ); ?></option>
-                        <option value="doughnut"><?php esc_html_e( 'Doughnut Chart', 'litestats-pro' ); ?></option>
-                        <option value="radar"><?php esc_html_e( 'Radar Chart', 'litestats-pro' ); ?></option>
-                        <option value="combo"><?php esc_html_e( 'Combo (Dual)', 'litestats-pro' ); ?></option>
+                        <option value="bar"><?php esc_html_e( 'Bar', 'litestats-pro' ); ?></option>
+                        <option value="line"><?php esc_html_e( 'Line', 'litestats-pro' ); ?></option>
+                        <option value="pie"><?php esc_html_e( 'Pie', 'litestats-pro' ); ?></option>
+                        <option value="doughnut"><?php esc_html_e( 'Doughnut', 'litestats-pro' ); ?></option>
+                        <option value="radar"><?php esc_html_e( 'Radar', 'litestats-pro' ); ?></option>
+                        <option value="combo"><?php esc_html_e( 'Combo', 'litestats-pro' ); ?></option>
                     </select>
                     <select class="btn" id="themeSelect">
-                        <option value="default"><?php esc_html_e( 'WP Default', 'litestats-pro' ); ?></option>
+                        <option value="default"><?php esc_html_e( 'Default', 'litestats-pro' ); ?></option>
                         <option value="modern"><?php esc_html_e( 'Modern', 'litestats-pro' ); ?></option>
                         <option value="pastel"><?php esc_html_e( 'Pastel', 'litestats-pro' ); ?></option>
-                        <option value="dark"><?php esc_html_e( 'Dark Mode', 'litestats-pro' ); ?></option>
+                        <option value="dark"><?php esc_html_e( 'Dark', 'litestats-pro' ); ?></option>
                     </select>
                     <button class="btn" id="toggleStackBtn">
                         <i class="fas fa-layer-group"></i>
                         <?php esc_html_e( 'Stack', 'litestats-pro' ); ?>
-                    </button>
-                </div>
-
-                <div class="chart-export">
-                    <button class="btn btn-sm" id="exportPngBtn">
-                        <i class="fas fa-download"></i>
-                        <?php esc_html_e( 'PNG', 'litestats-pro' ); ?>
                     </button>
                 </div>
             </div>
@@ -200,9 +197,17 @@ if ( ! $is_new ) {
             <div class="litestats-card" id="chartConfigCard">
                 <strong><?php esc_html_e( 'Chart Configuration', 'litestats-pro' ); ?></strong>
 
-                <div class="config-row" style="margin-top:10px;">
-                    <label for="chartLabelCol"><?php esc_html_e( 'Label Column', 'litestats-pro' ); ?></label>
-                    <select class="btn" id="chartLabelCol" style="width:100%"></select>
+                <div class="config-grid" style="margin-top:12px;">
+                    <div>
+                        <label for="chartLabelCol"><?php esc_html_e( 'Label Column', 'litestats-pro' ); ?></label>
+                        <select class="btn" id="chartLabelCol" style="width:100%"></select>
+                    </div>
+                    <div>
+                        <label for="groupByCol"><?php esc_html_e( 'Group By', 'litestats-pro' ); ?></label>
+                        <select class="btn" id="groupByCol" style="width:100%">
+                            <option value="-1"><?php esc_html_e( 'None', 'litestats-pro' ); ?></option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="config-row" style="margin-top:10px;">
@@ -222,26 +227,19 @@ if ( ! $is_new ) {
                     </div>
                 </div>
 
-                <div class="config-grid" style="margin-top:10px;">
-                    <div>
-                        <label for="legendPosition"><?php esc_html_e( 'Legend Position', 'litestats-pro' ); ?></label>
-                        <select class="btn" id="legendPosition" style="width:100%">
-                            <option value="top"><?php esc_html_e( 'Top', 'litestats-pro' ); ?></option>
-                            <option value="bottom"><?php esc_html_e( 'Bottom', 'litestats-pro' ); ?></option>
-                            <option value="left"><?php esc_html_e( 'Left', 'litestats-pro' ); ?></option>
-                            <option value="right"><?php esc_html_e( 'Right', 'litestats-pro' ); ?></option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="checkbox-label" style="margin-top:4px;">
-                            <input type="checkbox" id="showLegend" checked>
-                            <?php esc_html_e( 'Show Legend', 'litestats-pro' ); ?>
-                        </label>
-                        <label class="checkbox-label" style="margin-top:6px;">
-                            <input type="checkbox" id="showDataLabels">
-                            <?php esc_html_e( 'Show Data Labels', 'litestats-pro' ); ?>
-                        </label>
-                    </div>
+                <div class="litestats-checkbox-row" style="margin-top:10px;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="showLegend" checked>
+                        <?php esc_html_e( 'Legend', 'litestats-pro' ); ?>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="showDataLabels">
+                        <?php esc_html_e( 'Data Labels', 'litestats-pro' ); ?>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="beginAtZero" checked>
+                        <?php esc_html_e( 'Start at 0', 'litestats-pro' ); ?>
+                    </label>
                 </div>
 
                 <!-- Line chart options -->
@@ -258,32 +256,39 @@ if ( ! $is_new ) {
 
                 <!-- Pie/Doughnut max width -->
                 <div class="config-row" id="pieMaxWidthRow" style="margin-top:10px;display:none;">
-                    <label for="pieMaxWidth"><?php esc_html_e( 'Pie Max Width (px)', 'litestats-pro' ); ?></label>
-                    <input type="number" class="btn" id="pieMaxWidth" value="0" min="0" max="2000" step="10" style="width:100%" placeholder="<?php esc_attr_e( '0 = no limit', 'litestats-pro' ); ?>">
-                    <small class="format-hint"><?php esc_html_e( '0 = no limit. e.g. 400', 'litestats-pro' ); ?></small>
-                </div>
-
-                <!-- Y-axis options -->
-                <div class="config-row" style="margin-top:10px;">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="beginAtZero" checked>
-                        <?php esc_html_e( 'Y-Axis Begin at Zero', 'litestats-pro' ); ?>
-                    </label>
-                </div>
-
-                <!-- Group By Column -->
-                <div class="config-row" style="margin-top:10px;">
-                    <label for="groupByCol"><?php esc_html_e( 'Group By Column', 'litestats-pro' ); ?></label>
-                    <select class="btn" id="groupByCol" style="width:100%">
-                        <option value="-1"><?php esc_html_e( 'None', 'litestats-pro' ); ?></option>
-                    </select>
-                    <small class="format-hint"><?php esc_html_e( 'Creates a sidebar menu from unique values in the selected column.', 'litestats-pro' ); ?></small>
+                    <label for="pieMaxWidth"><?php esc_html_e( 'Max Width (px)', 'litestats-pro' ); ?></label>
+                    <input type="number" class="btn" id="pieMaxWidth" value="0" min="0" max="2000" step="10" style="width:100%" placeholder="<?php esc_attr_e( '0 = auto', 'litestats-pro' ); ?>">
                 </div>
 
                 <!-- Per-series colors -->
                 <div class="config-row" style="margin-top:10px;">
                     <label><?php esc_html_e( 'Series Colors', 'litestats-pro' ); ?></label>
                     <div id="seriesColorsContainer"></div>
+                </div>
+            </div>
+
+            <!-- Table Settings Card -->
+            <div class="litestats-card" id="tableSettingsCard">
+                <strong><?php esc_html_e( 'Table Settings', 'litestats-pro' ); ?></strong>
+                <div class="config-grid" style="margin-top:10px;">
+                    <div>
+                        <label for="tableRowsPerPage"><?php esc_html_e( 'Rows Per Page', 'litestats-pro' ); ?></label>
+                        <input type="number" class="btn" id="tableRowsPerPage" value="25" min="1" max="500" style="width:100%">
+                    </div>
+                    <div class="litestats-checkbox-col">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="tableStriped" checked>
+                            <?php esc_html_e( 'Striped', 'litestats-pro' ); ?>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="tableShowSearch" checked>
+                            <?php esc_html_e( 'Search', 'litestats-pro' ); ?>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="tableShowExport" checked>
+                            <?php esc_html_e( 'Export', 'litestats-pro' ); ?>
+                        </label>
+                    </div>
                 </div>
             </div>
 
@@ -306,46 +311,8 @@ if ( ! $is_new ) {
                     </label>
                 </div>
                 <small class="format-hint">
-                    <?php esc_html_e( 'Select a column header to apply formats.', 'litestats-pro' ); ?>
+                    <?php esc_html_e( 'Select a column header to apply.', 'litestats-pro' ); ?>
                 </small>
-            </div>
-
-            <!-- Table Settings Card -->
-            <div class="litestats-card" id="tableSettingsCard">
-                <strong><?php esc_html_e( 'Table Settings', 'litestats-pro' ); ?></strong>
-                <div class="config-grid" style="margin-top:10px;">
-                    <div>
-                        <label for="tableRowsPerPage"><?php esc_html_e( 'Rows Per Page', 'litestats-pro' ); ?></label>
-                        <input type="number" class="btn" id="tableRowsPerPage" value="25" min="1" max="500" style="width:100%">
-                    </div>
-                    <div>
-                        <label>&nbsp;</label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="tableStriped" checked>
-                            <?php esc_html_e( 'Striped Rows', 'litestats-pro' ); ?>
-                        </label>
-                    </div>
-                </div>
-                <div class="config-grid" style="margin-top:10px;">
-                    <div>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="tableShowSearch" checked>
-                            <?php esc_html_e( 'Show Search', 'litestats-pro' ); ?>
-                        </label>
-                    </div>
-                    <div>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="tableShowExport" checked>
-                            <?php esc_html_e( 'Show Export', 'litestats-pro' ); ?>
-                        </label>
-                    </div>
-                </div>
-                <div class="config-row" style="margin-top:10px;">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="tableColumnFilters">
-                        <?php esc_html_e( 'Column Filters', 'litestats-pro' ); ?>
-                    </label>
-                </div>
             </div>
 
             <!-- Conditional Formatting Card -->
@@ -358,14 +325,6 @@ if ( ! $is_new ) {
                 </div>
                 <div id="condRulesContainer"></div>
                 <small class="format-hint"><?php esc_html_e( 'Highlight cells based on value conditions.', 'litestats-pro' ); ?></small>
-            </div>
-
-            <!-- Chart Title Card -->
-            <div class="litestats-card">
-                <strong><?php esc_html_e( 'Chart Title', 'litestats-pro' ); ?></strong>
-                <input type="text" class="btn chart-title-input" id="chartTitle"
-                       placeholder="<?php esc_attr_e( 'Enter chart title...', 'litestats-pro' ); ?>"
-                       value="<?php echo esc_attr( $chart_title ); ?>">
             </div>
         </div>
     </div>

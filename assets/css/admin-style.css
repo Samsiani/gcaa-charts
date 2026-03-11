@@ -520,11 +520,38 @@
     justify-content: center;
 }
 
-.litestats-wrap .chart-export {
-    margin-top: 10px;
+/* Compact card (title input) */
+.litestats-card.litestats-card--compact {
+    padding: 10px 14px;
+}
+
+.litestats-card--compact .chart-title-input {
+    margin-top: 0;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    padding: 6px 8px;
+    background: transparent;
+}
+
+.litestats-card--compact .chart-title-input:focus {
+    background: var(--litestats-primary-light);
+    border-radius: 4px;
+}
+
+/* Checkbox row (inline checkboxes) */
+.litestats-checkbox-row {
     display: flex;
-    gap: 10px;
-    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+/* Checkbox column (stacked checkboxes) */
+.litestats-checkbox-col {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-top: 4px;
 }
 
 .litestats-wrap .col-format-grid {

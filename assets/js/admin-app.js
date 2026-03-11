@@ -139,19 +139,16 @@
                 theme: 'default',
                 stacked: false,
                 view: 'chart',
-                mode: 'value',
                 chartLabelCol: 0,
                 chartDataCols: [],
                 xAxisLabel: '',
                 yAxisLabel: '',
-                legendPosition: 'top',
                 showLegend: true,
                 showDataLabels: false,
                 seriesColors: {},
                 tableRowsPerPage: 25,
                 tableShowSearch: true,
                 tableShowExport: true,
-                tableColumnFilters: false,
                 tableStriped: true,
                 conditionalRules: [],
                 fillArea: false,
@@ -180,7 +177,7 @@
             $('#undoBtn').on('click', function() { self.undo(); });
             $('#redoBtn').on('click', function() { self.redo(); });
             $('#transposeBtn').on('click', function() { self.transposeTable(); });
-            $('#savePresetBtn').on('click', function() { self.savePreset(); });
+            // Preset removed
             $('#addRowBtn').on('click', function() { self.addRow(); });
 
             // CSV Import via wizard
@@ -280,10 +277,6 @@
                 self.app.settings.yAxisLabel = this.value;
                 self.updateChartRender();
             });
-            $('#legendPosition').on('change', function() {
-                self.app.settings.legendPosition = this.value;
-                self.updateChartRender();
-            });
             $('#showLegend').on('change', function() {
                 self.app.settings.showLegend = this.checked;
                 self.updateChartRender();
@@ -328,7 +321,6 @@
             $('#tableRowsPerPage').on('change', function() { self.app.settings.tableRowsPerPage = parseInt(this.value, 10) || 25; });
             $('#tableShowSearch').on('change', function() { self.app.settings.tableShowSearch = this.checked; });
             $('#tableShowExport').on('change', function() { self.app.settings.tableShowExport = this.checked; });
-            $('#tableColumnFilters').on('change', function() { self.app.settings.tableColumnFilters = this.checked; });
             $('#tableStriped').on('change', function() { self.app.settings.tableStriped = this.checked; });
 
             // Conditional formatting
@@ -648,7 +640,6 @@
             $('#tableRowsPerPage').val(s.tableRowsPerPage);
             $('#tableShowSearch').prop('checked', s.tableShowSearch);
             $('#tableShowExport').prop('checked', s.tableShowExport);
-            $('#tableColumnFilters').prop('checked', s.tableColumnFilters);
             $('#tableStriped').prop('checked', s.tableStriped);
         },
 
@@ -680,7 +671,6 @@
             // Axis labels
             $('#xAxisLabel').val(settings.xAxisLabel || '');
             $('#yAxisLabel').val(settings.yAxisLabel || '');
-            $('#legendPosition').val(settings.legendPosition || 'top');
             $('#showLegend').prop('checked', settings.showLegend !== false);
             $('#showDataLabels').prop('checked', settings.showDataLabels || false);
 
@@ -849,7 +839,13 @@
                     plugins: {
                         legend: {
                             display: settings.showLegend !== false,
-                            position: settings.legendPosition || 'top'
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'rectRounded',
+                                padding: 14,
+                                font: { size: 11 }
+                            }
                         },
                         tooltip: {
                             callbacks: {
@@ -971,18 +967,6 @@
             };
             reader.readAsText(file);
             e.target.value = '';
-        },
-
-        savePreset: function() {
-            var name = prompt('Enter preset name:', 'My Style 1');
-            if (name) {
-                var preset = {
-                    settings: this.app.settings,
-                    props: this.app.cols.map(function(c) { return c.props; })
-                };
-                localStorage.setItem('litestats_preset_' + name, JSON.stringify(preset));
-                this.showToast(liteStatsProAdmin.strings.presetSaved);
-            }
         },
 
         exportPng: function() {
