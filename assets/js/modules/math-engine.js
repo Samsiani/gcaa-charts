@@ -1,377 +1,443 @@
 /**
  * LiteStats Pro - Math Engine Module
  *
- * Handles all formula calculations including SUM, AVG, MIN, MAX, IF, CONCAT.
- * Uses a safe expression parser instead of eval() for security.
+ * Excel-style formula engine.
+ * Columns are addressed by letters (A, B, C...), rows by numbers (1, 2, 3...).
+ * Cell references: A1, B3. Column references: A, B (whole column for current row).
+ * Supports: SUM, AVG, MIN, MAX, IF, CONCAT, ABS, ROUND, COUNT.
+ * Operators: + - * / > < >= <= == != %
  *
  * @package LiteStats\Pro
- * @since   5.0.0
+ * @since   5.1.0
  */
-
-/* global liteStatsProAdmin */
 
 (function(window) {
     'use strict';
 
     /**
-     * Safe Expression Parser.
-     * Parses and evaluates mathematical expressions without using eval().
+     * Convert column index (0-based) to Excel letter(s): 0→A, 1→B, 25→Z, 26→AA
      */
-    const ExpressionParser = {
-        /**
-         * Available functions.
-         */
-        functions: {
-            SUM: function() {
-                var args = Array.prototype.slice.call(arguments);
-                return args.reduce(function(a, b) { return a + (parseFloat(b) || 0); }, 0);
-            },
-            AVG: function() {
-                var args = Array.prototype.slice.call(arguments);
-                var sum = args.reduce(function(a, b) { return a + (parseFloat(b) || 0); }, 0);
-                return args.length > 0 ? sum / args.length : 0;
-            },
-            MAX: function() {
-                var args = Array.prototype.slice.call(arguments).map(function(v) { return parseFloat(v) || 0; });
-                return Math.max.apply(null, args);
-            },
-            MIN: function() {
-                var args = Array.prototype.slice.call(arguments).map(function(v) { return parseFloat(v) || 0; });
-                return Math.min.apply(null, args);
-            },
-            IF: function(cond, trueVal, falseVal) {
-                return cond ? trueVal : falseVal;
-            },
-            CONCAT: function() {
-                return Array.prototype.slice.call(arguments).join('');
-            },
-            ABS: function(val) {
-                return Math.abs(parseFloat(val) || 0);
-            },
-            ROUND: function(val, decimals) {
-                var num = parseFloat(val) || 0;
-                var dec = parseInt(decimals) || 0;
-                return Number(num.toFixed(dec));
-            }
-        },
+    function colToLetter(idx) {
+        var s = '';
+        idx++;
+        while (idx > 0) {
+            idx--;
+            s = String.fromCharCode(65 + (idx % 26)) + s;
+            idx = Math.floor(idx / 26);
+        }
+        return s;
+    }
 
-        /**
-         * Tokenize an expression string.
-         * @param {string} expr - The expression to tokenize.
-         * @returns {Array} Array of tokens.
-         */
-        tokenize: function(expr) {
-            var tokens = [];
-            var current = '';
-            var inString = false;
-            var stringChar = '';
-            var parenDepth = 0;
-            
-            for (var i = 0; i < expr.length; i++) {
-                var char = expr[i];
-                
-                // Handle strings
-                if ((char === '"' || char === "'") && !inString) {
-                    inString = true;
-                    stringChar = char;
-                    current += char;
-                    continue;
-                }
-                
-                if (char === stringChar && inString) {
-                    inString = false;
-                    current += char;
-                    continue;
-                }
-                
-                if (inString) {
-                    current += char;
-                    continue;
-                }
-                
-                // Track parentheses depth
-                if (char === '(') parenDepth++;
-                if (char === ')') parenDepth--;
-                
-                // Skip whitespace
-                if (char === ' ' && parenDepth === 0) {
-                    if (current) {
-                        tokens.push(current);
-                        current = '';
-                    }
-                    continue;
-                }
-                
-                // Handle operators at depth 0
-                if (parenDepth === 0 && '+-*/><!='.indexOf(char) !== -1) {
-                    if (current) {
-                        tokens.push(current);
-                        current = '';
-                    }
-                    
-                    // Check for multi-char operators
-                    var nextChar = expr[i + 1];
-                    if ((char === '>' || char === '<' || char === '=' || char === '!') && nextChar === '=') {
-                        tokens.push(char + nextChar);
-                        i++;
-                    } else {
-                        tokens.push(char);
-                    }
-                    continue;
-                }
-                
-                current += char;
-            }
-            
-            if (current) {
-                tokens.push(current);
-            }
-            
-            return tokens;
-        },
+    /**
+     * Convert Excel letter(s) to column index (0-based): A→0, B→1, Z→25, AA→26
+     */
+    function letterToCol(letters) {
+        var n = 0;
+        for (var i = 0; i < letters.length; i++) {
+            n = n * 26 + (letters.charCodeAt(i) - 64);
+        }
+        return n - 1;
+    }
 
-        /**
-         * Parse and evaluate a value or function call.
-         * @param {string} token - The token to parse.
-         * @returns {*} The evaluated value.
-         */
-        parseValue: function(token) {
-            if (token === undefined || token === null) {
-                return 0;
-            }
-            
-            token = String(token).trim();
-            
-            // Handle strings
-            if ((token.startsWith('"') && token.endsWith('"')) || 
-                (token.startsWith("'") && token.endsWith("'"))) {
-                return token.slice(1, -1);
-            }
-            
-            // Handle numbers
-            var num = parseFloat(token);
-            if (!isNaN(num) && String(num) === token) {
-                return num;
-            }
-            
-            // Handle function calls
-            var funcMatch = token.match(/^([A-Z]+)\((.+)\)$/);
-            if (funcMatch) {
-                var funcName = funcMatch[1];
-                var argsStr = funcMatch[2];
-                
-                if (this.functions[funcName]) {
-                    var args = this.parseArguments(argsStr);
-                    return this.functions[funcName].apply(null, args);
-                }
-            }
-            
-            // Handle parentheses
-            if (token.startsWith('(') && token.endsWith(')')) {
-                return this.evaluate(token.slice(1, -1));
-            }
-            
-            // Return as string if nothing else matches
-            return token;
-        },
+    // Expose helpers
+    window.LiteStatsColToLetter = colToLetter;
+    window.LiteStatsLetterToCol = letterToCol;
 
-        /**
-         * Parse function arguments, handling nested functions.
-         * @param {string} argsStr - The arguments string.
-         * @returns {Array} Array of parsed argument values.
-         */
-        parseArguments: function(argsStr) {
-            var args = [];
-            var current = '';
-            var depth = 0;
-            var inString = false;
-            var stringChar = '';
-            
-            for (var i = 0; i < argsStr.length; i++) {
-                var char = argsStr[i];
-                
-                // Track strings
-                if ((char === '"' || char === "'") && !inString) {
-                    inString = true;
-                    stringChar = char;
-                } else if (char === stringChar && inString) {
-                    inString = false;
-                }
-                
-                // Track parentheses
-                if (!inString && char === '(') depth++;
-                if (!inString && char === ')') depth--;
-                
-                // Split on comma at depth 0
-                if (char === ',' && depth === 0 && !inString) {
-                    args.push(this.evaluate(current.trim()));
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            
-            if (current.trim()) {
-                args.push(this.evaluate(current.trim()));
-            }
-            
-            return args;
+    /**
+     * Built-in functions.
+     */
+    var FUNCTIONS = {
+        SUM: function(args) {
+            return args.reduce(function(a, b) { return a + (parseFloat(b) || 0); }, 0);
         },
-
-        /**
-         * Evaluate a comparison expression.
-         * @param {*} left - Left operand.
-         * @param {string} op - Operator.
-         * @param {*} right - Right operand.
-         * @returns {boolean} Comparison result.
-         */
-        compare: function(left, op, right) {
-            var l = parseFloat(left);
-            var r = parseFloat(right);
-            var useNumbers = !isNaN(l) && !isNaN(r);
-            
-            if (useNumbers) {
-                left = l;
-                right = r;
-            }
-            
-            switch (op) {
-                case '>': return left > right;
-                case '<': return left < right;
-                case '>=': return left >= right;
-                case '<=': return left <= right;
-                case '==': return left == right;
-                case '!=': return left != right;
-                default: return false;
-            }
+        AVG: function(args) {
+            var sum = args.reduce(function(a, b) { return a + (parseFloat(b) || 0); }, 0);
+            return args.length > 0 ? sum / args.length : 0;
         },
-
-        /**
-         * Evaluate an expression.
-         * @param {string} expr - The expression to evaluate.
-         * @returns {*} The result.
-         */
-        evaluate: function(expr) {
-            if (expr === undefined || expr === null) {
-                return 0;
-            }
-            
-            expr = String(expr).trim();
-            
-            // Handle empty expression
-            if (!expr) {
-                return 0;
-            }
-            
-            // Tokenize
-            var tokens = this.tokenize(expr);
-            
-            if (tokens.length === 0) {
-                return 0;
-            }
-            
-            if (tokens.length === 1) {
-                return this.parseValue(tokens[0]);
-            }
-            
-            // Handle comparisons first
-            var compOps = ['>=', '<=', '!=', '==', '>', '<'];
-            for (var c = 0; c < compOps.length; c++) {
-                var compIdx = tokens.indexOf(compOps[c]);
-                if (compIdx !== -1) {
-                    var left = this.evaluate(tokens.slice(0, compIdx).join(' '));
-                    var right = this.evaluate(tokens.slice(compIdx + 1).join(' '));
-                    return this.compare(left, compOps[c], right);
-                }
-            }
-            
-            // Handle addition/subtraction (left to right)
-            var result = this.parseValue(tokens[0]);
-            for (var i = 1; i < tokens.length; i += 2) {
-                var op = tokens[i];
-                var val = this.parseValue(tokens[i + 1]);
-                
-                if (op === '+') {
-                    result = (parseFloat(result) || 0) + (parseFloat(val) || 0);
-                } else if (op === '-') {
-                    result = (parseFloat(result) || 0) - (parseFloat(val) || 0);
-                } else if (op === '*') {
-                    result = (parseFloat(result) || 0) * (parseFloat(val) || 0);
-                } else if (op === '/') {
-                    var divisor = parseFloat(val) || 0;
-                    result = divisor !== 0 ? (parseFloat(result) || 0) / divisor : '#DIV/0';
-                }
-            }
-            
-            return result;
+        MAX: function(args) {
+            var nums = args.map(function(v) { return parseFloat(v) || 0; });
+            return Math.max.apply(null, nums);
+        },
+        MIN: function(args) {
+            var nums = args.map(function(v) { return parseFloat(v) || 0; });
+            return Math.min.apply(null, nums);
+        },
+        COUNT: function(args) {
+            return args.filter(function(v) { return v !== '' && v !== null && v !== undefined; }).length;
+        },
+        ABS: function(args) {
+            return Math.abs(parseFloat(args[0]) || 0);
+        },
+        ROUND: function(args) {
+            var num = parseFloat(args[0]) || 0;
+            var dec = parseInt(args[1]) || 0;
+            return Number(num.toFixed(dec));
+        },
+        IF: function(args) {
+            return args[0] ? args[1] : args[2];
+        },
+        CONCAT: function(args) {
+            return args.join('');
         }
     };
 
     /**
-     * Math Engine object for formula evaluation.
+     * Tokenize a formula expression into tokens.
      */
-    const MathEngine = {
+    function tokenize(expr) {
+        var tokens = [];
+        var i = 0;
+        var len = expr.length;
+
+        while (i < len) {
+            var ch = expr[i];
+
+            // Skip whitespace
+            if (ch === ' ' || ch === '\t') { i++; continue; }
+
+            // String literals
+            if (ch === '"' || ch === "'") {
+                var quote = ch;
+                var str = '';
+                i++;
+                while (i < len && expr[i] !== quote) {
+                    if (expr[i] === '\\') { i++; str += expr[i] || ''; }
+                    else { str += expr[i]; }
+                    i++;
+                }
+                i++; // skip closing quote
+                tokens.push({ type: 'string', value: str });
+                continue;
+            }
+
+            // Numbers (including decimals)
+            if ((ch >= '0' && ch <= '9') || (ch === '.' && i + 1 < len && expr[i + 1] >= '0' && expr[i + 1] <= '9')) {
+                var num = '';
+                while (i < len && ((expr[i] >= '0' && expr[i] <= '9') || expr[i] === '.')) {
+                    num += expr[i]; i++;
+                }
+                tokens.push({ type: 'number', value: parseFloat(num) });
+                continue;
+            }
+
+            // Multi-char operators
+            if (i + 1 < len) {
+                var two = ch + expr[i + 1];
+                if (two === '>=' || two === '<=' || two === '==' || two === '!=') {
+                    tokens.push({ type: 'op', value: two });
+                    i += 2; continue;
+                }
+            }
+
+            // Single-char operators
+            if ('+-*/><(),%'.indexOf(ch) !== -1) {
+                tokens.push({ type: 'op', value: ch });
+                i++; continue;
+            }
+
+            // Identifiers: function names or cell/column refs (e.g. SUM, A, B2, AA1)
+            if ((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch === '_') {
+                var id = '';
+                while (i < len && ((expr[i] >= 'A' && expr[i] <= 'Z') || (expr[i] >= 'a' && expr[i] <= 'z') || (expr[i] >= '0' && expr[i] <= '9') || expr[i] === '_')) {
+                    id += expr[i]; i++;
+                }
+                tokens.push({ type: 'ident', value: id });
+                continue;
+            }
+
+            // Unknown char — skip
+            i++;
+        }
+        return tokens;
+    }
+
+    /**
+     * Parser — recursive descent.
+     * Produces an AST from tokens.
+     */
+    function Parser(tokens) {
+        this.tokens = tokens;
+        this.pos = 0;
+    }
+
+    Parser.prototype.peek = function() {
+        return this.pos < this.tokens.length ? this.tokens[this.pos] : null;
+    };
+
+    Parser.prototype.consume = function() {
+        return this.tokens[this.pos++];
+    };
+
+    Parser.prototype.expect = function(type, value) {
+        var t = this.consume();
+        if (!t || t.type !== type || (value !== undefined && t.value !== value)) {
+            throw new Error('Expected ' + type + ' ' + (value || ''));
+        }
+        return t;
+    };
+
+    // Expression: comparison
+    Parser.prototype.parseExpression = function() {
+        var left = this.parseAddSub();
+        var t = this.peek();
+        if (t && t.type === 'op' && (t.value === '>' || t.value === '<' || t.value === '>=' || t.value === '<=' || t.value === '==' || t.value === '!=')) {
+            var op = this.consume().value;
+            var right = this.parseAddSub();
+            return { type: 'binop', op: op, left: left, right: right };
+        }
+        return left;
+    };
+
+    // Addition / Subtraction
+    Parser.prototype.parseAddSub = function() {
+        var node = this.parseMulDiv();
+        while (true) {
+            var t = this.peek();
+            if (t && t.type === 'op' && (t.value === '+' || t.value === '-')) {
+                var op = this.consume().value;
+                var right = this.parseMulDiv();
+                node = { type: 'binop', op: op, left: node, right: right };
+            } else {
+                break;
+            }
+        }
+        return node;
+    };
+
+    // Multiplication / Division
+    Parser.prototype.parseMulDiv = function() {
+        var node = this.parseUnary();
+        while (true) {
+            var t = this.peek();
+            if (t && t.type === 'op' && (t.value === '*' || t.value === '/')) {
+                var op = this.consume().value;
+                var right = this.parseUnary();
+                node = { type: 'binop', op: op, left: node, right: right };
+            } else {
+                break;
+            }
+        }
+        return node;
+    };
+
+    // Unary minus / plus
+    Parser.prototype.parseUnary = function() {
+        var t = this.peek();
+        if (t && t.type === 'op' && (t.value === '-' || t.value === '+')) {
+            var op = this.consume().value;
+            var operand = this.parsePostfix();
+            if (op === '-') {
+                return { type: 'binop', op: '*', left: { type: 'number', value: -1 }, right: operand };
+            }
+            return operand;
+        }
+        return this.parsePostfix();
+    };
+
+    // Postfix: percent operator (e.g. 5%)
+    Parser.prototype.parsePostfix = function() {
+        var node = this.parsePrimary();
+        var t = this.peek();
+        if (t && t.type === 'op' && t.value === '%') {
+            this.consume();
+            return { type: 'binop', op: '*', left: node, right: { type: 'number', value: 0.01 } };
+        }
+        return node;
+    };
+
+    // Primary: number, string, ref, function call, parenthesized expression
+    Parser.prototype.parsePrimary = function() {
+        var t = this.peek();
+        if (!t) throw new Error('Unexpected end of expression');
+
+        // Number
+        if (t.type === 'number') {
+            this.consume();
+            return { type: 'number', value: t.value };
+        }
+
+        // String
+        if (t.type === 'string') {
+            this.consume();
+            return { type: 'string', value: t.value };
+        }
+
+        // Parenthesized expression
+        if (t.type === 'op' && t.value === '(') {
+            this.consume();
+            var expr = this.parseExpression();
+            this.expect('op', ')');
+            return expr;
+        }
+
+        // Identifier: function call or cell/column reference
+        if (t.type === 'ident') {
+            this.consume();
+            var name = t.value.toUpperCase();
+
+            // Function call?
+            var next = this.peek();
+            if (next && next.type === 'op' && next.value === '(') {
+                this.consume(); // skip (
+                var args = [];
+                if (!(this.peek() && this.peek().type === 'op' && this.peek().value === ')')) {
+                    args.push(this.parseExpression());
+                    while (this.peek() && this.peek().type === 'op' && this.peek().value === ',') {
+                        this.consume(); // skip ,
+                        args.push(this.parseExpression());
+                    }
+                }
+                this.expect('op', ')');
+                return { type: 'call', name: name, args: args };
+            }
+
+            // Cell or column reference
+            // Pure letters = column ref (A, B, AA), letters+digits = cell ref (A1, B3)
+            var match = name.match(/^([A-Z]+)(\d+)?$/);
+            if (match) {
+                if (match[2]) {
+                    // Cell reference: A1 → col=0, row=0
+                    return { type: 'cellref', col: letterToCol(match[1]), row: parseInt(match[2]) - 1 };
+                } else {
+                    // Column reference: A → col=0, same row
+                    return { type: 'colref', col: letterToCol(match[1]) };
+                }
+            }
+
+            throw new Error('Unknown identifier: ' + name);
+        }
+
+        throw new Error('Unexpected token: ' + (t.value || t.type));
+    };
+
+    /**
+     * Evaluate an AST node.
+     * @param {Object} node - AST node.
+     * @param {Object} ctx - { rows, cols, rowIdx }
+     */
+    function evalNode(node, ctx) {
+        switch (node.type) {
+            case 'number': return node.value;
+            case 'string': return node.value;
+
+            case 'colref': {
+                // Reference to the same row, given column
+                var val = ctx.rows[ctx.rowIdx][node.col];
+                return (val === '' || val === undefined || val === null) ? 0 : (isNaN(parseFloat(val)) ? val : parseFloat(val));
+            }
+
+            case 'cellref': {
+                // Reference to specific row and column
+                if (node.row < 0 || node.row >= ctx.rows.length) return 0;
+                var v = ctx.rows[node.row][node.col];
+                return (v === '' || v === undefined || v === null) ? 0 : (isNaN(parseFloat(v)) ? v : parseFloat(v));
+            }
+
+            case 'binop': {
+                var left = evalNode(node.left, ctx);
+                var right = evalNode(node.right, ctx);
+                var l = parseFloat(left) || 0;
+                var r = parseFloat(right) || 0;
+
+                switch (node.op) {
+                    case '+': return l + r;
+                    case '-': return l - r;
+                    case '*': return l * r;
+                    case '/': return r !== 0 ? l / r : '#DIV/0';
+                    case '>': return l > r;
+                    case '<': return l < r;
+                    case '>=': return l >= r;
+                    case '<=': return l <= r;
+                    case '==': return left == right;
+                    case '!=': return left != right;
+                    default: return 0;
+                }
+            }
+
+            case 'call': {
+                var fn = FUNCTIONS[node.name];
+                if (!fn) throw new Error('Unknown function: ' + node.name);
+
+                // For SUM/AVG/MIN/MAX/COUNT with a single column ref arg, expand to all rows
+                if (node.args.length === 1 && node.args[0].type === 'colref' &&
+                    (node.name === 'SUM' || node.name === 'AVG' || node.name === 'MIN' || node.name === 'MAX' || node.name === 'COUNT')) {
+                    var cIdx = node.args[0].col;
+                    var vals = ctx.rows.map(function(row) {
+                        var v = row[cIdx];
+                        return (v === '' || v === undefined || v === null) ? 0 : (parseFloat(v) || 0);
+                    });
+                    return fn(vals);
+                }
+
+                // For range notation like SUM(B1:B5) — not implemented yet, but could be added
+                var argVals = node.args.map(function(a) { return evalNode(a, ctx); });
+                return fn(argVals);
+            }
+
+            default:
+                return 0;
+        }
+    }
+
+    /**
+     * Math Engine — public API.
+     */
+    var MathEngine = {
         /**
-         * Evaluate a formula for a given row.
+         * Evaluate a formula for a specific row.
          *
-         * @param {string} formula - The formula string (e.g., "=SUM({c1}, {c2})").
-         * @param {Array} row - The row data array.
-         * @param {Array} cols - The columns configuration array.
-         * @returns {*} The calculated result or "#ERR" on error.
+         * @param {string} formula - e.g. "=A+B", "=A*B*5%", "=SUM(B)"
+         * @param {number} rowIdx - current row index (0-based)
+         * @param {Array} rows - all rows data
+         * @param {Array} cols - column definitions
+         * @returns {*} result or "#ERR"
          */
-        evaluate: function(formula, row, cols) {
-            if (!formula || !formula.startsWith('=')) {
+        evaluate: function(formula, rowIdx, rows, cols) {
+            if (!formula || typeof formula !== 'string' || formula.charAt(0) !== '=') {
                 return formula;
             }
 
-            var expression = formula.substring(1); // Remove '='
+            var expression = formula.substring(1).trim();
+            if (!expression) return 0;
 
-            // 1. Replace Column IDs {c1} with actual values
-            cols.forEach(function(col, idx) {
-                var val = row[idx];
-                // Preserve strings in quotes, convert numbers
-                if (typeof val === 'string' && isNaN(parseFloat(val))) {
-                    // Escape backslashes first, then double quotes
-                    val = '"' + val.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
-                } else {
-                    val = parseFloat(val) || 0;
-                }
-                var regex = new RegExp('\\{' + col.id + '\\}', 'g');
-                expression = expression.replace(regex, val);
-            });
-
-            // 2. Evaluate using safe parser
             try {
-                return ExpressionParser.evaluate(expression);
+                var tokens = tokenize(expression);
+                var parser = new Parser(tokens);
+                var ast = parser.parseExpression();
+                return evalNode(ast, { rows: rows, cols: cols, rowIdx: rowIdx });
             } catch (e) {
-                console.error('MathEngine error:', e);
+                console.error('MathEngine error:', formula, e.message);
                 return '#ERR';
             }
         },
 
         /**
-         * Recalculate all formula columns in the app state.
+         * Recalculate all formula columns.
+         * Runs multiple passes to resolve inter-column dependencies.
          *
-         * @param {Object} app - The application state object.
+         * @param {Object} app - { cols, rows }
          */
         recalcAll: function(app) {
-            if (!app || !app.cols || !app.rows) {
-                return;
-            }
+            if (!app || !app.cols || !app.rows) return;
 
             var self = this;
-            app.cols.forEach(function(col, cIdx) {
-                if (col.type === 'formula') {
-                    app.rows.forEach(function(row) {
-                        row[cIdx] = self.evaluate(col.formula, row, app.cols);
-                    });
-                }
-            });
-        }
+            // Two passes to handle dependencies between formula columns
+            for (var pass = 0; pass < 2; pass++) {
+                app.cols.forEach(function(col, cIdx) {
+                    if (col.type === 'formula' && col.formula) {
+                        app.rows.forEach(function(row, rIdx) {
+                            row[cIdx] = self.evaluate(col.formula, rIdx, app.rows, app.cols);
+                        });
+                    }
+                });
+            }
+        },
+
+        // Expose helpers for other modules
+        colToLetter: colToLetter,
+        letterToCol: letterToCol
     };
 
-    // Export to window
     window.LiteStatsMathEngine = MathEngine;
-    window.LiteStatsExpressionParser = ExpressionParser;
 
 })(window);

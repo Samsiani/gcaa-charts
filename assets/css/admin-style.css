@@ -297,9 +297,27 @@
 
 .litestats-wrap .th-top {
     display: flex;
-    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
     font-size: 10px;
     color: #888;
+}
+
+.litestats-wrap .col-letter {
+    background: var(--litestats-primary);
+    color: #fff;
+    font-weight: 700;
+    font-size: 10px;
+    line-height: 1;
+    padding: 2px 5px;
+    border-radius: 3px;
+    margin-right: auto;
+}
+
+.litestats-wrap .row-num-header {
+    width: 42px;
+    min-width: 42px;
+    background: #f0f0f0;
 }
 
 .litestats-wrap .th-title {
@@ -357,9 +375,10 @@
     color: var(--litestats-danger);
 }
 
-/* Drag Handles */
+/* Row Handles */
 .litestats-wrap .row-handle {
-    width: 35px;
+    width: 42px;
+    min-width: 42px;
     background: #f4f4f4;
     border-right: 1px solid #ccc;
     border-bottom: 1px solid #ccc;
@@ -367,26 +386,36 @@
     cursor: grab;
     position: relative;
     vertical-align: middle;
+    padding: 0 2px;
+}
+
+.litestats-wrap .row-num {
+    font-size: 11px;
+    font-weight: 600;
+    color: #888;
+    user-select: none;
+}
+
+.litestats-wrap .row-grip {
+    color: #bbb;
+    font-size: 10px;
+    margin-left: 2px;
 }
 
 .litestats-wrap .row-handle:hover {
     background: #e0e0e0;
 }
 
-.litestats-wrap .row-handle i {
-    color: #bbb;
-    font-size: 12px;
+.litestats-wrap .row-handle:hover .row-num,
+.litestats-wrap .row-handle:hover .row-grip {
+    display: none;
 }
 
 .litestats-wrap .del-row {
-    position: absolute;
-    left: 2px;
-    top: 50%;
-    transform: translateY(-50%);
     color: var(--litestats-danger);
     opacity: 0;
     cursor: pointer;
-    padding: 4px;
+    font-size: 12px;
 }
 
 .litestats-wrap .row-handle:hover .del-row {

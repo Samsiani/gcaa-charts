@@ -1,14 +1,14 @@
 /**
  * LiteStats Pro - Grid UI Module
  *
- * Handles grid rendering, drag & drop, and DOM manipulation.
- * Extracted from index.html prototype.
+ * Handles grid rendering with Excel-style column letters (A, B, C...)
+ * and row numbers (1, 2, 3...).
  *
  * @package LiteStats\Pro
- * @since   5.0.0
+ * @since   5.1.0
  */
 
-/* global LiteStatsMathEngine, LiteStatsState */
+/* global LiteStatsMathEngine, LiteStatsState, LiteStatsColToLetter */
 
 (function(window) {
     'use strict';
@@ -16,19 +16,14 @@
     /**
      * Grid UI Manager.
      */
-    const GridUI = {
+    var GridUI = {
         /**
          * Current drag row index.
-         * @type {number|null}
          */
         dragRowIdx: null,
 
         /**
          * Format a cell value based on column properties.
-         *
-         * @param {*} val - The cell value.
-         * @param {Object} col - The column configuration.
-         * @returns {string} Formatted value.
          */
         formatValue: function(val, col) {
             if (col.type === 'string') {
@@ -40,21 +35,18 @@
                 return val;
             }
 
-            // Handle percentage display for formula columns
+            // Percentage display for formula columns
             if (col.type === 'formula' && col.props && col.props.isPercent) {
                 num = num * 100;
             }
 
-            // Precision
             if (col.props && col.props.precision) {
                 num = num.toFixed(col.props.precision);
             }
 
-            // Prefix/Suffix
             var prefix = (col.props && col.props.prefix) ? col.props.prefix : '';
             var suffix = (col.props && col.props.suffix) ? col.props.suffix : '';
 
-            // Append % suffix for percentage formula columns
             if (col.type === 'formula' && col.props && col.props.isPercent) {
                 suffix = suffix + '%';
             }
@@ -63,10 +55,7 @@
         },
 
         /**
-         * Render the grid table.
-         *
-         * @param {Object} app - The application state.
-         * @param {Object} options - Render options with callbacks.
+         * Render the grid table with Excel-style headers.
          */
         renderGrid: function(app, options) {
             var self = this;
@@ -74,74 +63,77 @@
 
             var thead = document.getElementById('gridHead');
             var tbody = document.getElementById('gridBody');
+            if (!thead || !tbody) return;
 
-            if (!thead || !tbody) {
-                return;
-            }
+            var colToLetter = window.LiteStatsColToLetter || function(i) {
+                var s = ''; i++;
+                while (i > 0) { i--; s = String.fromCharCode(65 + (i % 26)) + s; i = Math.floor(i / 26); }
+                return s;
+            };
 
-            // 1. Render Headers
-            var hHtml = '<tr><th style="width:40px; background:#f0f0f0;"></th>';
-            
+            // === HEADERS ===
+            // Row number column + data columns
+            var hHtml = '<tr><th class="row-num-header"></th>';
+
             app.cols.forEach(function(col, idx) {
+                var letter = colToLetter(idx);
                 var isSelected = app.selectedCol === idx ? 'color:var(--litestats-primary)' : '';
                 var typeLabel;
-                
-                // For formula columns, show static label; for others, show select dropdown
+
                 if (col.type === 'formula') {
-                    typeLabel = '<span class="col-type-label">ƒ(x)</span>';
+                    typeLabel = '<span class="col-type-label">\u0192(x)</span>';
                 } else {
                     typeLabel = '<select class="col-type-select" data-col-idx="' + idx + '">' +
                         '<option value="string"' + (col.type === 'string' ? ' selected' : '') + '>ABC</option>' +
                         '<option value="number"' + (col.type === 'number' ? ' selected' : '') + '>123</option>' +
                     '</select>';
                 }
-                
+
                 hHtml += '<th>' +
                     '<div class="th-inner" data-col-idx="' + idx + '">' +
                         '<div class="th-top">' +
-                            '<span class="col-move-left" data-idx="' + idx + '">◀</span>' +
+                            '<span class="col-letter">' + letter + '</span>' +
+                            '<span class="col-move-left" data-idx="' + idx + '">\u25C0</span>' +
                             typeLabel +
-                            '<span class="col-delete" data-idx="' + idx + '">✕</span>' +
+                            '<span class="col-delete" data-idx="' + idx + '">\u2715</span>' +
                         '</div>' +
                         '<input class="th-title" id="th-title-' + idx + '" value="' + self.escapeHtml(col.name) + '" ' +
                                'style="' + isSelected + '" data-col-idx="' + idx + '">' +
                     '</div>' +
                 '</th>';
             });
-            
+
             hHtml += '</tr>';
             thead.innerHTML = hHtml;
 
-            // 2. Render Rows
+            // === ROWS ===
             var bHtml = '';
-            
+
             app.rows.forEach(function(row, rIdx) {
+                var rowNum = rIdx + 1;
                 bHtml += '<tr>';
 
-                // Drag Handle Cell
+                // Row number + handle + delete
                 bHtml += '<td class="row-handle" draggable="true" data-row-idx="' + rIdx + '">' +
-                    '<i class="fas fa-grip-vertical"></i>' +
+                    '<span class="row-num">' + rowNum + '</span>' +
+                    '<i class="fas fa-grip-vertical row-grip"></i>' +
                     '<i class="fas fa-times del-row" data-row-idx="' + rIdx + '"></i>' +
                 '</td>';
 
-                // Data Cells
+                // Data cells
                 row.forEach(function(cell, cIdx) {
                     var col = app.cols[cIdx];
                     var isFormula = col.type === 'formula';
-
-                    // Display formatted value
                     var displayVal = isFormula ? cell : self.formatValue(cell, col);
 
                     var cls = 'cell-input';
-                    if (isFormula) {
-                        cls += ' cell-calculated';
-                    }
+                    if (isFormula) cls += ' cell-calculated';
 
-                    // Conditional Formatting
+                    // Conditional formatting
                     if (col.name.toLowerCase().indexOf('growth') !== -1 || col.name.indexOf('%') !== -1) {
-                        var num = parseFloat(cell);
-                        if (num > 0) cls += ' val-pos';
-                        if (num < 0) cls += ' val-neg';
+                        var n = parseFloat(cell);
+                        if (n > 0) cls += ' val-pos';
+                        if (n < 0) cls += ' val-neg';
                     }
 
                     var readonly = isFormula ? 'readonly' : '';
@@ -154,13 +146,11 @@
 
                 bHtml += '</tr>';
             });
-            
+
             tbody.innerHTML = bHtml;
 
-            // Attach event listeners
             this.attachGridEvents(app, options);
 
-            // Update status and chart
             if (typeof options.onRenderComplete === 'function') {
                 options.onRenderComplete();
             }
@@ -168,20 +158,18 @@
 
         /**
          * Attach event listeners to grid elements.
-         *
-         * @param {Object} app - The application state.
-         * @param {Object} options - Options with callbacks.
          */
         attachGridEvents: function(app, options) {
             var self = this;
             options = options || {};
 
-            // Column header clicks (select column)
+            // Column header clicks
             document.querySelectorAll('.th-inner').forEach(function(el) {
                 el.addEventListener('click', function(e) {
-                    if (e.target.classList.contains('col-move-left') || 
+                    if (e.target.classList.contains('col-move-left') ||
                         e.target.classList.contains('col-delete') ||
-                        e.target.classList.contains('th-title')) {
+                        e.target.classList.contains('th-title') ||
+                        e.target.classList.contains('col-type-select')) {
                         return;
                     }
                     var idx = parseInt(this.dataset.colIdx, 10);
@@ -228,15 +216,11 @@
                 el.addEventListener('change', function(e) {
                     e.stopPropagation();
                     var idx = parseInt(this.dataset.colIdx, 10);
-                    var newType = this.value;
                     if (typeof options.onColumnTypeChange === 'function') {
-                        options.onColumnTypeChange(idx, newType);
+                        options.onColumnTypeChange(idx, this.value);
                     }
                 });
-                // Prevent click from propagating to th-inner
-                el.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                });
+                el.addEventListener('click', function(e) { e.stopPropagation(); });
             });
 
             // Cell input changes
@@ -265,79 +249,44 @@
                 el.addEventListener('dragstart', function(e) {
                     self.handleDragStart(e, parseInt(this.dataset.rowIdx, 10));
                 });
-
-                el.addEventListener('dragover', function(e) {
-                    e.preventDefault();
-                });
-
+                el.addEventListener('dragover', function(e) { e.preventDefault(); });
                 el.addEventListener('drop', function(e) {
-                    var targetIdx = parseInt(this.dataset.rowIdx, 10);
-                    self.handleDrop(e, app, targetIdx, options);
+                    self.handleDrop(e, app, parseInt(this.dataset.rowIdx, 10), options);
                 });
             });
         },
 
-        /**
-         * Handle drag start event.
-         *
-         * @param {Event} e - The drag event.
-         * @param {number} idx - The row index.
-         */
         handleDragStart: function(e, idx) {
             this.dragRowIdx = idx;
             e.dataTransfer.effectAllowed = 'move';
             e.target.closest('tr').style.opacity = '0.5';
         },
 
-        /**
-         * Handle drop event.
-         *
-         * @param {Event} e - The drop event.
-         * @param {Object} app - The application state.
-         * @param {number} targetIdx - The target row index.
-         * @param {Object} options - Options with callbacks.
-         */
         handleDrop: function(e, app, targetIdx, options) {
             e.preventDefault();
+            if (this.dragRowIdx === null) return;
 
-            if (this.dragRowIdx === null) {
-                return;
-            }
-
-            // Save state before change
             if (window.LiteStatsState) {
                 window.LiteStatsState.saveState(app);
             }
 
-            // Move row
             var row = app.rows.splice(this.dragRowIdx, 1)[0];
             app.rows.splice(targetIdx, 0, row);
-
             this.dragRowIdx = null;
 
-            // Re-render
             if (typeof options.onReorder === 'function') {
                 options.onReorder();
             }
         },
 
-        /**
-         * Escape HTML entities.
-         *
-         * @param {string} str - String to escape.
-         * @returns {string} Escaped string.
-         */
         escapeHtml: function(str) {
-            if (typeof str !== 'string') {
-                return str;
-            }
+            if (typeof str !== 'string') return str;
             var div = document.createElement('div');
             div.textContent = str;
             return div.innerHTML;
         }
     };
 
-    // Export to window
     window.LiteStatsGridUI = GridUI;
 
 })(window);

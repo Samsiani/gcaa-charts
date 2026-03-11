@@ -104,11 +104,11 @@ $page_title  = $is_new ? __( 'Add New Chart', 'litestats-pro' ) : __( 'Edit Char
             <!-- Formula Bar -->
             <div class="litestats-formula-bar-wrapper">
                 <span class="fx-icon">fx</span>
-                <input type="text" class="formula-input" id="formulaInput" 
-                       placeholder="<?php esc_attr_e( 'Select a column header to edit formula...', 'litestats-pro' ); ?>" 
+                <input type="text" class="formula-input" id="formulaInput"
+                       placeholder="<?php esc_attr_e( 'e.g. =B+C, =SUM(B), =B1*5%, =IF(C>B, "UP", "DOWN")', 'litestats-pro' ); ?>"
                        disabled>
                 <div class="formula-help">
-                    <?php esc_html_e( 'Supported: SUM, AVG, MIN, MAX, IF, CONCAT', 'litestats-pro' ); ?>
+                    <?php esc_html_e( 'Use column letters (A, B, C) or cell refs (A1, B3). Functions: SUM, AVG, MIN, MAX, IF, ABS, ROUND, COUNT', 'litestats-pro' ); ?>
                 </div>
             </div>
 

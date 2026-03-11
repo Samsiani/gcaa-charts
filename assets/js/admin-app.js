@@ -91,8 +91,45 @@
                 };
             }
 
+            // Migrate old {c1} formulas to new letter-based refs
+            this.migrateOldFormulas();
+
             // Sync UI with settings
             this.syncSettingsUI();
+        },
+
+        /**
+         * Migrate old {c1}/{c2} formula syntax to Excel-style A/B/C letters.
+         * Maps each column's internal id to its position letter.
+         */
+        migrateOldFormulas: function() {
+            var cols = this.app.cols;
+            var colToLetter = window.LiteStatsColToLetter;
+            if (!colToLetter) return;
+
+            // Build id→letter map
+            var idMap = {};
+            cols.forEach(function(col, idx) {
+                if (col.id) {
+                    idMap[col.id] = colToLetter(idx);
+                }
+            });
+
+            // Replace {c1} → A, {c2} → B, etc. in all formula columns
+            cols.forEach(function(col) {
+                if (col.type === 'formula' && col.formula) {
+                    var changed = false;
+                    var f = col.formula;
+                    Object.keys(idMap).forEach(function(id) {
+                        var regex = new RegExp('\\{' + id + '\\}', 'g');
+                        if (regex.test(f)) {
+                            f = f.replace(regex, idMap[id]);
+                            changed = true;
+                        }
+                    });
+                    if (changed) col.formula = f;
+                }
+            });
         },
 
         /**
@@ -103,7 +140,7 @@
                 { id: 'c1', name: 'Product', type: 'string', width: 150, props: {} },
                 { id: 'c2', name: '2023 Sales', type: 'number', width: 100, props: { prefix: '$' } },
                 { id: 'c3', name: '2024 Sales', type: 'number', width: 100, props: { prefix: '$' } },
-                { id: 'c4', name: 'Growth', type: 'formula', formula: '=IF({c3}>{c2}, "UP", "DOWN")', width: 100, props: {} }
+                { id: 'c4', name: 'Growth', type: 'formula', formula: '=IF(C>B, "UP", "DOWN")', width: 100, props: {} }
             ];
         },
 
@@ -290,12 +327,15 @@
 
             // Update Formula Bar
             var fInput = $('#formulaInput');
+            var colToLetter = window.LiteStatsColToLetter;
+            var letter = colToLetter ? colToLetter(idx) : '?';
             if (col.type === 'formula') {
                 fInput.val(col.formula);
                 fInput.prop('disabled', false);
+                fInput.attr('placeholder', 'e.g. =B+C, =SUM(B), =B1*5%');
                 fInput.focus();
             } else {
-                fInput.val('Column ID: {' + col.id + '}');
+                fInput.val('Column ' + letter + ' (' + col.name + ')');
                 fInput.prop('disabled', true);
             }
         },
