@@ -60,10 +60,16 @@ class Updater {
      * Attach all WordPress update-system hooks.
      */
     private function register_hooks(): void {
+        // Inject update on both write and read of the transient.
         add_filter( 'pre_set_site_transient_update_plugins', [ $this, 'check_for_update' ] );
-        add_filter( 'plugins_api',                          [ $this, 'plugin_info'       ], 10, 3 );
-        add_action( 'upgrader_process_complete',            [ $this, 'purge_transient'   ], 10, 2 );
-        add_filter( 'upgrader_source_selection',            [ $this, 'fix_source_dir'    ], 10, 4 );
+        add_filter( 'site_transient_update_plugins',         [ $this, 'check_for_update' ] );
+
+        // Purge our GitHub API cache when WP does "Check Again" (force-check=1).
+        add_action( 'delete_site_transient_update_plugins',  [ $this, 'flush_cache' ] );
+
+        add_filter( 'plugins_api',               [ $this, 'plugin_info'     ], 10, 3 );
+        add_action( 'upgrader_process_complete',  [ $this, 'purge_transient' ], 10, 2 );
+        add_filter( 'upgrader_source_selection',  [ $this, 'fix_source_dir'  ], 10, 4 );
     }
 
     /**
@@ -230,6 +236,14 @@ class Updater {
         if ( in_array( $this->plugin_slug, $updated, true ) ) {
             delete_transient( $this->transient_key );
         }
+    }
+
+    /**
+     * Flush the GitHub API cache.
+     * Called when WordPress deletes its update_plugins transient (e.g. "Check Again").
+     */
+    public function flush_cache(): void {
+        delete_transient( $this->transient_key );
     }
 
     /**
