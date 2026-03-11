@@ -129,6 +129,14 @@
         var ctx = canvas.getContext('2d');
         var palette = themes[settings.theme] || themes['default'];
         var labelCol = settings.chartLabelCol || 0;
+
+        // When grouping is active and label col is the group col, shift to next column
+        if (typeof settings.groupByCol !== 'undefined' && settings.groupByCol >= 0 && labelCol === settings.groupByCol) {
+            for (var li = 0; li < cols.length; li++) {
+                if (li !== settings.groupByCol) { labelCol = li; break; }
+            }
+        }
+
         var dataCols = getDataColumnIndices(cols, settings);
 
         // Labels
