@@ -611,12 +611,13 @@
             }
         });
 
-        // Build sidebar list
-        var strings = (typeof liteStatsProFrontend !== 'undefined' && liteStatsProFrontend.strings) ? liteStatsProFrontend.strings : {};
-        var allLabel = strings.all || 'All';
-        var html = '<li class="litestats-group-item active" data-group="__all__">' +
-            '<span class="litestats-group-name">' + escapeHtml(allLabel) + '</span>' +
-            '<span class="litestats-group-count">' + rows.length + '</span></li>';
+        // "All" button in header
+        var allBtn = sidebar.querySelector('.litestats-group-all');
+        var allCount = allBtn ? allBtn.querySelector('.litestats-group-count') : null;
+        if (allCount) allCount.textContent = rows.length;
+
+        // Build sidebar list (groups only, no "All")
+        var html = '';
         groups.forEach(function(g) {
             var count = rows.filter(function(r) { return String(r[groupCol] || '') === g; }).length;
             html += '<li class="litestats-group-item" data-group="' + escapeHtml(g) + '">' +
@@ -625,40 +626,52 @@
         });
         list.innerHTML = html;
 
-        // Click handler
+        // Shared filter handler
+        function handleGroupClick(group, activeEl) {
+            // Remove active from all
+            if (allBtn) allBtn.classList.remove('active');
+            list.querySelectorAll('.litestats-group-item').forEach(function(el) { el.classList.remove('active'); });
+            activeEl.classList.add('active');
+
+            var filteredRows;
+            if (group === '__all__') {
+                filteredRows = rows;
+            } else {
+                filteredRows = rows.filter(function(r) { return String(r[groupCol] || '') === group; });
+            }
+
+            var filteredData = {
+                id: chartData.id,
+                config: { cols: config.cols, rows: filteredRows },
+                settings: settings,
+                _groupFiltered: (group !== '__all__')
+            };
+
+            var contentArea = container.querySelector('.litestats-content-area');
+            if (!contentArea) return;
+
+            var oldCanvas = contentArea.querySelector('.litestats-canvas');
+            if (oldCanvas) {
+                var existingChart = Chart.getChart(oldCanvas);
+                if (existingChart) existingChart.destroy();
+                var newCanvas = document.createElement('canvas');
+                newCanvas.className = 'litestats-canvas';
+                oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+            }
+            renderChart(containerId, filteredData);
+        }
+
+        // "All" click
+        if (allBtn) {
+            allBtn.addEventListener('click', function() {
+                handleGroupClick('__all__', this);
+            });
+        }
+
+        // Group item clicks
         list.querySelectorAll('.litestats-group-item').forEach(function(li) {
             li.addEventListener('click', function() {
-                list.querySelectorAll('.litestats-group-item').forEach(function(el) { el.classList.remove('active'); });
-                this.classList.add('active');
-
-                var group = this.dataset.group;
-                var filteredRows;
-                if (group === '__all__') {
-                    filteredRows = rows;
-                } else {
-                    filteredRows = rows.filter(function(r) { return String(r[groupCol] || '') === group; });
-                }
-
-                var filteredData = {
-                    id: chartData.id,
-                    config: { cols: config.cols, rows: filteredRows },
-                    settings: settings,
-                    _groupFiltered: (group !== '__all__')
-                };
-
-                // Destroy existing chart and re-render
-                var contentArea = container.querySelector('.litestats-content-area');
-                if (!contentArea) return;
-
-                var oldCanvas = contentArea.querySelector('.litestats-canvas');
-                if (oldCanvas) {
-                    var existingChart = Chart.getChart(oldCanvas);
-                    if (existingChart) existingChart.destroy();
-                    var newCanvas = document.createElement('canvas');
-                    newCanvas.className = 'litestats-canvas';
-                    oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
-                }
-                renderChart(containerId, filteredData);
+                handleGroupClick(this.dataset.group, this);
             });
         });
     }

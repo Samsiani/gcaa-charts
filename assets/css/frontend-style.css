@@ -23,42 +23,57 @@
 /* ─── Group Sidebar (chart-only) ─── */
 .litestats-container.litestats-has-groups {
     display: flex;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    overflow: hidden;
-    background: #fff;
 }
 
 .litestats-group-sidebar {
-    width: 230px;
-    min-width: 230px;
-    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
-    border-right: 1px solid #e2e8f0;
+    width: 200px;
+    min-width: 200px;
     display: flex;
     flex-direction: column;
+    padding: 6px 6px 6px 0;
 }
 
-.litestats-group-title {
-    padding: 14px 18px;
-    font-weight: 700;
-    font-size: 11px;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    border-bottom: 1px solid #e2e8f0;
+.litestats-group-all {
+    padding: 9px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    transition: all 0.15s ease;
     flex-shrink: 0;
+}
+
+.litestats-group-all:hover {
+    background: #f1f5f9;
+    color: #1e293b;
+}
+
+.litestats-group-all.active {
+    background: #3b82f6;
+    color: #fff;
+}
+
+.litestats-group-all.active .litestats-group-count {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
 }
 
 .litestats-group-list {
     list-style: none;
     margin: 0;
-    padding: 6px;
+    padding: 0;
     overflow-y: auto;
     flex: 1;
 }
 
 .litestats-group-item {
-    padding: 9px 12px;
+    padding: 8px 12px;
     cursor: pointer;
     font-size: 13px;
     color: #475569;
@@ -67,19 +82,18 @@
     align-items: center;
     gap: 8px;
     border-radius: 6px;
-    margin-bottom: 2px;
+    margin-bottom: 1px;
     transition: all 0.15s ease;
 }
 
 .litestats-group-item:hover {
-    background: #e2e8f0;
+    background: #f1f5f9;
     color: #1e293b;
 }
 
 .litestats-group-item.active {
     background: #3b82f6;
     color: #fff;
-    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.3);
 }
 
 .litestats-group-name {
@@ -93,7 +107,7 @@
 .litestats-group-count {
     font-size: 11px;
     font-weight: 600;
-    background: rgba(0, 0, 0, 0.06);
+    background: rgba(0, 0, 0, 0.05);
     color: #64748b;
     padding: 1px 8px;
     border-radius: 10px;
@@ -110,7 +124,6 @@
 .litestats-has-groups .litestats-content-area {
     flex: 1;
     min-width: 0;
-    padding: 4px;
 }
 
 /* ─── Canvas ─── */
@@ -456,19 +469,23 @@
     .litestats-group-sidebar {
         width: 100%;
         min-width: 100%;
-        border-right: none;
-        border-bottom: 1px solid #e2e8f0;
+        padding: 6px;
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: 6px;
     }
 
-    .litestats-group-title {
-        padding: 10px 14px;
+    .litestats-group-all {
+        border-radius: 20px;
+        padding: 6px 14px;
+        font-size: 12px;
+        margin-bottom: 0;
     }
 
     .litestats-group-list {
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
-        padding: 10px;
         overflow-y: visible;
     }
 
@@ -476,7 +493,7 @@
         border-radius: 20px;
         padding: 6px 14px;
         font-size: 12px;
-        background: #e2e8f0;
+        background: #f1f5f9;
         margin-bottom: 0;
     }
 

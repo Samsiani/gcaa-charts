@@ -188,7 +188,7 @@ class Shortcode {
         <div class="litestats-container<?php echo $has_group ? ' litestats-has-groups' : ''; ?>" id="<?php echo esc_attr( $instance_id ); ?>" style="width: <?php echo $width; ?>; <?php echo 'table' !== $settings['view'] && ! $has_group ? 'height: ' . $height . ';' : ''; ?>">
             <?php if ( $has_group ) : ?>
                 <div class="litestats-group-sidebar">
-                    <div class="litestats-group-title"><?php esc_html_e( 'Groups', 'litestats-pro' ); ?></div>
+                    <div class="litestats-group-all active" data-group="__all__"><?php esc_html_e( 'All', 'litestats-pro' ); ?> <span class="litestats-group-count"></span></div>
                     <ul class="litestats-group-list"></ul>
                 </div>
             <?php endif; ?>
