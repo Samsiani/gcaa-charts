@@ -40,12 +40,6 @@ class Updater {
     /** @var int Cache lifetime in seconds (12 hours). */
     private int $cache_ttl = 43200;
 
-    /**
-     * @param string $plugin_file     __FILE__ from litestats-pro.php.
-     * @param string $github_owner    GitHub username / org.
-     * @param string $github_repo     GitHub repository name.
-     * @param string $current_version LITESTATS_PRO_VERSION constant.
-     */
     public function __construct( string $plugin_file, string $github_owner, string $github_repo, string $current_version ) {
         $this->plugin_file     = $plugin_file;
         $this->plugin_slug     = plugin_basename( $plugin_file );
@@ -56,15 +50,12 @@ class Updater {
         $this->register_hooks();
     }
 
-    /**
-     * Attach all WordPress update-system hooks.
-     */
     private function register_hooks(): void {
-        // Inject update on both write and read of the transient.
+        // Inject on both write and read.
         add_filter( 'pre_set_site_transient_update_plugins', [ $this, 'check_for_update' ] );
         add_filter( 'site_transient_update_plugins',         [ $this, 'check_for_update' ] );
 
-        // Purge our GitHub API cache when WP does "Check Again" (force-check=1).
+        // Purge our cache when WP does "Check Again" (force-check=1).
         add_action( 'delete_site_transient_update_plugins',  [ $this, 'flush_cache' ] );
 
         add_filter( 'plugins_api',               [ $this, 'plugin_info'     ], 10, 3 );
@@ -74,12 +65,10 @@ class Updater {
 
     /**
      * Fetch the latest release from GitHub, with caching.
-     *
-     * @return array|false Associative array with 'version', 'package_url', 'body', 'published'; or false.
      */
     private function get_latest_release() {
         $cached = get_transient( $this->transient_key );
-        if ( false !== $cached ) {
+        if ( is_array( $cached ) && ! empty( $cached['version'] ) ) {
             return $cached;
         }
 
@@ -101,14 +90,12 @@ class Updater {
 
         $code = wp_remote_retrieve_response_code( $response );
         if ( 200 !== (int) $code ) {
-            set_transient( $this->transient_key, false, 300 );
             return false;
         }
 
         $data = json_decode( wp_remote_retrieve_body( $response ), true );
 
         if ( ! is_array( $data ) || empty( $data['tag_name'] ) ) {
-            set_transient( $this->transient_key, false, 300 );
             return false;
         }
 
@@ -137,18 +124,20 @@ class Updater {
     }
 
     /**
-     * Inject update info when a newer version is available on GitHub.
-     *
-     * @param  object $transient WordPress update transient.
-     * @return object
+     * Inject update info when a newer version is available.
+     * Works on both pre_set (write) and read paths.
      */
     public function check_for_update( $transient ) {
-        if ( empty( $transient->checked ) ) {
-            return $transient;
+        // Ensure we have a valid object.
+        if ( ! is_object( $transient ) ) {
+            $transient = new \stdClass();
+        }
+        if ( ! isset( $transient->response ) ) {
+            $transient->response = [];
         }
 
         $release = $this->get_latest_release();
-        if ( ! $release ) {
+        if ( ! $release || empty( $release['package_url'] ) ) {
             return $transient;
         }
 
@@ -175,12 +164,7 @@ class Updater {
     }
 
     /**
-     * Provide plugin info for the "View version details" modal in WP Admin.
-     *
-     * @param  false|object $result
-     * @param  string       $action
-     * @param  object       $args
-     * @return false|object
+     * Provide plugin info for the "View version details" modal.
      */
     public function plugin_info( $result, $action, $args ) {
         if ( 'plugin_information' !== $action ) {
@@ -217,9 +201,6 @@ class Updater {
 
     /**
      * Clear cached release after an upgrade.
-     *
-     * @param  \WP_Upgrader $upgrader
-     * @param  array        $hook_extra
      */
     public function purge_transient( $upgrader, $hook_extra ): void {
         if ( empty( $hook_extra['type'] ) || 'plugin' !== $hook_extra['type'] ) {
@@ -240,7 +221,6 @@ class Updater {
 
     /**
      * Flush the GitHub API cache.
-     * Called when WordPress deletes its update_plugins transient (e.g. "Check Again").
      */
     public function flush_cache(): void {
         delete_transient( $this->transient_key );
@@ -248,15 +228,6 @@ class Updater {
 
     /**
      * Rename extracted zip folder to match the installed plugin folder.
-     *
-     * GitHub zips extract to a folder like "gcaa-charts-vX.X.X/" but WordPress
-     * expects the folder to match the installed plugin directory name.
-     *
-     * @param  string       $source        Extracted source path.
-     * @param  string       $remote_source Remote source path.
-     * @param  \WP_Upgrader $upgrader      Upgrader instance.
-     * @param  array        $hook_extra    Extra data.
-     * @return string|\WP_Error
      */
     public function fix_source_dir( $source, $remote_source, $upgrader, $hook_extra ) {
         // Only act on our plugin.
