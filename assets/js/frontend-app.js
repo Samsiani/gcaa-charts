@@ -44,8 +44,11 @@
             num = num * 100;
         }
 
-        if (col.props && col.props.precision) {
-            num = num.toFixed(col.props.precision);
+        var precision = (col.props && col.props.precision) ? col.props.precision : null;
+        if (precision !== null) {
+            num = num.toFixed(precision);
+        } else if (col.type === 'formula' && num !== Math.floor(num)) {
+            num = num.toFixed(2);
         }
 
         var prefix = (col.props && col.props.prefix) ? col.props.prefix : '';

@@ -40,8 +40,12 @@
                 num = num * 100;
             }
 
-            if (col.props && col.props.precision) {
-                num = num.toFixed(col.props.precision);
+            var precision = (col.props && col.props.precision) ? col.props.precision : null;
+            if (precision !== null) {
+                num = num.toFixed(precision);
+            } else if (col.type === 'formula' && num !== Math.floor(num)) {
+                // Auto-round formula results to 2 decimals when no precision is set
+                num = num.toFixed(2);
             }
 
             var prefix = (col.props && col.props.prefix) ? col.props.prefix : '';
@@ -124,7 +128,7 @@
                 row.forEach(function(cell, cIdx) {
                     var col = app.cols[cIdx];
                     var isFormula = col.type === 'formula';
-                    var displayVal = isFormula ? cell : self.formatValue(cell, col);
+                    var displayVal = self.formatValue(cell, col);
 
                     var cls = 'cell-input';
                     if (isFormula) cls += ' cell-calculated';

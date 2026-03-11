@@ -3,7 +3,7 @@
  * Plugin Name:       LiteStats Pro
  * Plugin URI:        https://github.com/Samsiani/gcaa-charts
  * Description:       High-Performance, Enterprise-Grade Data Visualization plugin with Math Engine, Drag & Drop, History, and Chart.js rendering.
- * Version:           5.1.1
+ * Version:           5.1.2
  * Requires at least: 5.8
  * Requires PHP:      7.4
  * Author:            Samsiani
@@ -26,7 +26,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Plugin constants.
-define( 'LITESTATS_PRO_VERSION', '5.1.1' );
+define( 'LITESTATS_PRO_VERSION', '5.1.2' );
 define( 'LITESTATS_PRO_PLUGIN_FILE', __FILE__ );
 define( 'LITESTATS_PRO_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LITESTATS_PRO_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
