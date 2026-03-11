@@ -336,49 +336,9 @@
             });
         }
 
-        // Column filters
-        function renderColumnFilters() {
-            var filtersEl = tableWrapper.querySelector('.litestats-column-filters');
-            if (!filtersEl || !settings.tableColumnFilters) return;
-
-            var fStrings = (typeof liteStatsProFrontend !== 'undefined' && liteStatsProFrontend.strings) ? liteStatsProFrontend.strings : {};
-            var html = '<div class="litestats-filter-row">';
-            cols.forEach(function(col, i) {
-                var colName = col.name || ('Col ' + i);
-                if (col.type === 'number' || col.type === 'currency' || col.type === 'percentage') {
-                    html += '<div class="litestats-filter-cell">' +
-                        '<input type="number" class="litestats-filter-min" data-col="' + i + '" placeholder="' + (fStrings.min || 'Min') + '">' +
-                        '<input type="number" class="litestats-filter-max" data-col="' + i + '" placeholder="' + (fStrings.max || 'Max') + '">' +
-                    '</div>';
-                } else if (col.type === 'date') {
-                    html += '<div class="litestats-filter-cell">' +
-                        '<input type="date" class="litestats-filter-date-from" data-col="' + i + '" title="' + colName + ' from">' +
-                        '<input type="date" class="litestats-filter-date-to" data-col="' + i + '" title="' + colName + ' to">' +
-                    '</div>';
-                } else {
-                    html += '<div class="litestats-filter-cell">' +
-                        '<input type="text" class="litestats-filter-text" data-col="' + i + '" placeholder="' + colName + '...">' +
-                    '</div>';
-                }
-            });
-            html += '</div>';
-            filtersEl.innerHTML = html;
-
-            // Bind filter events
-            filtersEl.querySelectorAll('input').forEach(function(input) {
-                input.addEventListener('input', function() {
-                    applyFilters();
-                    currentPage = 1;
-                    renderBody();
-                    renderPagination();
-                });
-            });
-        }
-
-        // Apply search + column filters
+        // Apply search filter
         function applyFilters() {
             filteredRows = allRows.filter(function(row) {
-                // Global search
                 if (searchTerm) {
                     var match = false;
                     for (var i = 0; i < row.length; i++) {
@@ -389,53 +349,6 @@
                     }
                     if (!match) return false;
                 }
-
-                // Column filters
-                if (settings.tableColumnFilters) {
-                    var filtersEl = tableWrapper.querySelector('.litestats-column-filters');
-                    if (filtersEl) {
-                        // Text filters
-                        var textFilters = filtersEl.querySelectorAll('.litestats-filter-text');
-                        for (var t = 0; t < textFilters.length; t++) {
-                            var tf = textFilters[t];
-                            if (tf.value) {
-                                var ci = parseInt(tf.dataset.col, 10);
-                                if (String(row[ci]).toLowerCase().indexOf(tf.value.toLowerCase()) === -1) return false;
-                            }
-                        }
-                        // Min/Max filters
-                        var minFilters = filtersEl.querySelectorAll('.litestats-filter-min');
-                        for (var m = 0; m < minFilters.length; m++) {
-                            if (minFilters[m].value !== '') {
-                                var mci = parseInt(minFilters[m].dataset.col, 10);
-                                if (parseFloat(row[mci]) < parseFloat(minFilters[m].value)) return false;
-                            }
-                        }
-                        var maxFilters = filtersEl.querySelectorAll('.litestats-filter-max');
-                        for (var mx = 0; mx < maxFilters.length; mx++) {
-                            if (maxFilters[mx].value !== '') {
-                                var mxci = parseInt(maxFilters[mx].dataset.col, 10);
-                                if (parseFloat(row[mxci]) > parseFloat(maxFilters[mx].value)) return false;
-                            }
-                        }
-                        // Date filters
-                        var dateFroms = filtersEl.querySelectorAll('.litestats-filter-date-from');
-                        for (var df = 0; df < dateFroms.length; df++) {
-                            if (dateFroms[df].value) {
-                                var dci = parseInt(dateFroms[df].dataset.col, 10);
-                                if (new Date(row[dci]) < new Date(dateFroms[df].value)) return false;
-                            }
-                        }
-                        var dateTos = filtersEl.querySelectorAll('.litestats-filter-date-to');
-                        for (var dt = 0; dt < dateTos.length; dt++) {
-                            if (dateTos[dt].value) {
-                                var dtci = parseInt(dateTos[dt].dataset.col, 10);
-                                if (new Date(row[dtci]) > new Date(dateTos[dt].value)) return false;
-                            }
-                        }
-                    }
-                }
-
                 return true;
             });
         }
@@ -635,7 +548,6 @@
 
         // Init
         renderHeaders();
-        renderColumnFilters();
         applyFilters();
         applySort();
         renderBody();

@@ -215,9 +215,6 @@ class Shortcode {
                                 </div>
                             <?php endif; ?>
                         </div>
-                        <?php if ( $settings['tableColumnFilters'] ) : ?>
-                            <div class="litestats-column-filters"></div>
-                        <?php endif; ?>
                         <table class="litestats-table<?php echo $settings['tableStriped'] ? ' litestats-striped' : ''; ?>">
                             <thead></thead>
                             <tbody></tbody>
