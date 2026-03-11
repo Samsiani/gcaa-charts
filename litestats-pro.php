@@ -128,6 +128,7 @@ final class LiteStatsPro {
         require_once LITESTATS_PRO_PLUGIN_DIR . 'includes/class-admin.php';
         require_once LITESTATS_PRO_PLUGIN_DIR . 'includes/class-ajax.php';
         require_once LITESTATS_PRO_PLUGIN_DIR . 'includes/class-shortcode.php';
+        require_once LITESTATS_PRO_PLUGIN_DIR . 'includes/class-updater.php';
     }
 
     /**
@@ -208,3 +209,6 @@ final class LiteStatsPro {
 
 // Initialize the plugin.
 LiteStatsPro::get_instance();
+
+// Initialize GitHub auto-updater.
+new Updater( __FILE__, 'Samsiani', 'gcaa-charts', LITESTATS_PRO_VERSION );

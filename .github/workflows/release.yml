@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: echo "version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+
+      - name: Stage plugin into zip folder
+        run: |
+          mkdir -p staging/litestats-pro
+          rsync -av --exclude='.git' --exclude='.github' --exclude='.gitignore' ./ staging/litestats-pro/
+
+      - name: Create ZIP
+        working-directory: staging
+        run: zip -r ../litestats-pro-${{ steps.version.outputs.version }}.zip litestats-pro/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: LiteStats Pro ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          make_latest: true
+          files: litestats-pro-${{ steps.version.outputs.version }}.zip
