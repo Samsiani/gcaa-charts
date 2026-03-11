@@ -145,6 +145,7 @@
                 xAxisLabel: '',
                 yAxisLabel: '',
                 legendPosition: 'top',
+                showLegend: true,
                 showDataLabels: false,
                 seriesColors: {},
                 tableRowsPerPage: 25,
@@ -280,6 +281,10 @@
             });
             $('#legendPosition').on('change', function() {
                 self.app.settings.legendPosition = this.value;
+                self.updateChartRender();
+            });
+            $('#showLegend').on('change', function() {
+                self.app.settings.showLegend = this.checked;
                 self.updateChartRender();
             });
             $('#showDataLabels').on('change', function() {
@@ -668,6 +673,7 @@
             $('#xAxisLabel').val(settings.xAxisLabel || '');
             $('#yAxisLabel').val(settings.yAxisLabel || '');
             $('#legendPosition').val(settings.legendPosition || 'top');
+            $('#showLegend').prop('checked', settings.showLegend !== false);
             $('#showDataLabels').prop('checked', settings.showDataLabels || false);
 
             this.updateSeriesColors();
@@ -834,6 +840,7 @@
                     },
                     plugins: {
                         legend: {
+                            display: settings.showLegend !== false,
                             position: settings.legendPosition || 'top'
                         },
                         tooltip: {

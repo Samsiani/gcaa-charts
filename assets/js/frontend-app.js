@@ -219,7 +219,7 @@
 
         var isPie = settings.chartType === 'pie' || settings.chartType === 'doughnut';
 
-        new Chart(ctx, {
+        var chartInstance = new Chart(ctx, {
             type: settings.chartType === 'combo' ? 'bar' : (settings.chartType || 'bar'),
             data: { labels: labels, datasets: datasets },
             options: {
@@ -244,7 +244,7 @@
                 },
                 plugins: {
                     legend: {
-                        position: settings.legendPosition || 'top'
+                        display: false
                     },
                     tooltip: {
                         callbacks: {
@@ -272,6 +272,100 @@
                 }
             }
         });
+
+        // Custom paginated legend
+        if (settings.showLegend !== false) {
+            buildPaginatedLegend(container, chartInstance, isPie, labels, datasets, palette);
+        }
+    }
+
+    /**
+     * Build a custom paginated legend below the chart.
+     */
+    function buildPaginatedLegend(container, chart, isPie, labels, datasets, palette) {
+        // Remove existing legend
+        var existing = container.querySelector('.litestats-legend');
+        if (existing) existing.remove();
+
+        // Collect legend items
+        var items = [];
+        if (isPie) {
+            // For pie/doughnut: one item per label (data point)
+            labels.forEach(function(label, i) {
+                var bgColors = datasets[0] ? datasets[0].backgroundColor : palette;
+                var color = Array.isArray(bgColors) ? bgColors[i % bgColors.length] : bgColors;
+                items.push({ label: label, color: color, index: i, datasetIndex: 0 });
+            });
+        } else {
+            // For bar/line/etc: one item per dataset
+            datasets.forEach(function(ds, i) {
+                items.push({ label: ds.label, color: ds.backgroundColor, index: i, datasetIndex: i });
+            });
+        }
+
+        if (items.length === 0) return;
+
+        var legendEl = document.createElement('div');
+        legendEl.className = 'litestats-legend';
+
+        var prevBtn = document.createElement('button');
+        prevBtn.className = 'litestats-legend-arrow litestats-legend-prev';
+        prevBtn.innerHTML = '\u2039';
+        prevBtn.type = 'button';
+
+        var track = document.createElement('div');
+        track.className = 'litestats-legend-track';
+
+        var inner = document.createElement('div');
+        inner.className = 'litestats-legend-inner';
+
+        items.forEach(function(item) {
+            var chip = document.createElement('span');
+            chip.className = 'litestats-legend-item';
+            chip.dataset.idx = item.index;
+            chip.dataset.dsIdx = item.datasetIndex;
+            chip.innerHTML = '<span class="litestats-legend-color" style="background:' + item.color + '"></span>' +
+                '<span class="litestats-legend-label">' + escapeHtml(item.label) + '</span>';
+            inner.appendChild(chip);
+        });
+
+        track.appendChild(inner);
+
+        var nextBtn = document.createElement('button');
+        nextBtn.className = 'litestats-legend-arrow litestats-legend-next';
+        nextBtn.innerHTML = '\u203a';
+        nextBtn.type = 'button';
+
+        legendEl.appendChild(prevBtn);
+        legendEl.appendChild(track);
+        legendEl.appendChild(nextBtn);
+
+        // Insert after canvas wrapper
+        var contentArea = container.querySelector('.litestats-content-area') || container;
+        contentArea.appendChild(legendEl);
+
+        // Scroll logic
+        var scrollStep = 200;
+
+        function updateArrows() {
+            prevBtn.style.visibility = track.scrollLeft > 0 ? 'visible' : 'hidden';
+            nextBtn.style.visibility = (track.scrollLeft + track.clientWidth < inner.scrollWidth - 1) ? 'visible' : 'hidden';
+        }
+
+        prevBtn.addEventListener('click', function() {
+            track.scrollLeft = Math.max(0, track.scrollLeft - scrollStep);
+            setTimeout(updateArrows, 200);
+        });
+
+        nextBtn.addEventListener('click', function() {
+            track.scrollLeft = Math.min(inner.scrollWidth - track.clientWidth, track.scrollLeft + scrollStep);
+            setTimeout(updateArrows, 200);
+        });
+
+        track.addEventListener('scroll', updateArrows);
+
+        // Initial arrow state (after render)
+        setTimeout(updateArrows, 50);
     }
 
     /**

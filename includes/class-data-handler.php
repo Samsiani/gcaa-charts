@@ -299,6 +299,7 @@ class DataHandler {
             'xAxisLabel'       => '',
             'yAxisLabel'       => '',
             'legendPosition'   => 'top',
+            'showLegend'       => true,
             'showDataLabels'   => false,
             'seriesColors'     => (object) [],
             'tableRowsPerPage' => 25,
@@ -391,6 +392,7 @@ class DataHandler {
 
         // Booleans.
         $sanitized['stacked']          = isset( $settings['stacked'] ) ? (bool) $settings['stacked'] : $defaults['stacked'];
+        $sanitized['showLegend']       = isset( $settings['showLegend'] ) ? (bool) $settings['showLegend'] : $defaults['showLegend'];
         $sanitized['showDataLabels']   = isset( $settings['showDataLabels'] ) ? (bool) $settings['showDataLabels'] : $defaults['showDataLabels'];
         $sanitized['tableShowSearch']  = isset( $settings['tableShowSearch'] ) ? (bool) $settings['tableShowSearch'] : $defaults['tableShowSearch'];
         $sanitized['tableShowExport']  = isset( $settings['tableShowExport'] ) ? (bool) $settings['tableShowExport'] : $defaults['tableShowExport'];

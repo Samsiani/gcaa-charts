@@ -233,8 +233,11 @@ if ( ! $is_new ) {
                         </select>
                     </div>
                     <div>
-                        <label>&nbsp;</label>
-                        <label class="checkbox-label">
+                        <label class="checkbox-label" style="margin-top:4px;">
+                            <input type="checkbox" id="showLegend" checked>
+                            <?php esc_html_e( 'Show Legend', 'litestats-pro' ); ?>
+                        </label>
+                        <label class="checkbox-label" style="margin-top:6px;">
                             <input type="checkbox" id="showDataLabels">
                             <?php esc_html_e( 'Show Data Labels', 'litestats-pro' ); ?>
                         </label>
