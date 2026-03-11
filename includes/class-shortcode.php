@@ -198,8 +198,8 @@ class Shortcode {
                         <div class="litestats-table-toolbar">
                             <?php if ( $settings['tableShowSearch'] ) : ?>
                                 <div class="litestats-search-wrapper">
-                                    <svg class="litestats-search-icon" viewBox="0 0 20 20" fill="currentColor" width="15" height="15"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
-                                    <input type="text" class="litestats-search" placeholder="<?php esc_attr_e( 'Search table...', 'litestats-pro' ); ?>" data-target="<?php echo esc_attr( $instance_id ); ?>">
+                                    <input type="text" class="litestats-search" placeholder="<?php esc_attr_e( 'Search...', 'litestats-pro' ); ?>" data-target="<?php echo esc_attr( $instance_id ); ?>">
+                                    <svg class="litestats-search-icon" viewBox="0 0 20 20" fill="currentColor" width="13" height="13"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
                                     <button type="button" class="litestats-search-clear" aria-label="<?php esc_attr_e( 'Clear', 'litestats-pro' ); ?>">&times;</button>
                                 </div>
                             <?php endif; ?>
