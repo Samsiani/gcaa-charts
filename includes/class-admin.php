@@ -259,7 +259,7 @@ class Admin {
         }
 
         $data_handler = LiteStatsPro::get_instance()->get_data_handler();
-        $charts       = $data_handler ? $data_handler->get_all_charts() : [];
+        $charts       = $data_handler ? $data_handler->get_all_charts( [ 'lean' => true ] ) : [];
 
         include LITESTATS_PRO_PLUGIN_DIR . 'templates/admin-charts-list.php';
     }

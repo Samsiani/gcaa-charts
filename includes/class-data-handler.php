@@ -183,11 +183,40 @@ class DataHandler {
     /**
      * Get all charts.
      *
-     * @param array $args Query arguments (unused, kept for compat).
+     * @param array $args Query arguments. 'lean' => true for list views (skips full JSON decode).
      * @return array Array of chart data.
      */
     public function get_all_charts( array $args = [] ): array {
         global $wpdb;
+
+        $lean = ! empty( $args['lean'] );
+
+        if ( $lean ) {
+            // List page: only fetch what's needed, avoid decoding large JSON blobs.
+            $rows = $wpdb->get_results(
+                "SELECT id, title, settings, updated_at,
+                        JSON_UNQUOTE(JSON_EXTRACT(settings, '$.chartType')) AS chart_type,
+                        JSON_LENGTH(JSON_EXTRACT(config, '$.rows')) AS row_count
+                 FROM {$this->table_name()} ORDER BY updated_at DESC"
+            );
+
+            if ( ! $rows ) {
+                return [];
+            }
+
+            $charts = [];
+            foreach ( $rows as $row ) {
+                $charts[] = [
+                    'id'       => (int) $row->id,
+                    'title'    => $row->title,
+                    'config'   => [ 'rows' => array_fill( 0, (int) ( $row->row_count ?? 0 ), [] ) ],
+                    'settings' => [ 'chartType' => $row->chart_type ?: 'bar' ],
+                    'modified' => $row->updated_at,
+                ];
+            }
+
+            return $charts;
+        }
 
         $rows = $wpdb->get_results(
             "SELECT * FROM {$this->table_name()} ORDER BY updated_at DESC"
@@ -293,19 +322,16 @@ class DataHandler {
             'theme'            => 'default',
             'stacked'          => false,
             'view'             => 'chart',
-            'mode'             => 'value',
             'chartLabelCol'    => 0,
             'chartDataCols'    => [],
             'xAxisLabel'       => '',
             'yAxisLabel'       => '',
-            'legendPosition'   => 'top',
             'showLegend'       => true,
             'showDataLabels'   => false,
             'seriesColors'     => (object) [],
             'tableRowsPerPage' => 25,
             'tableShowSearch'  => true,
             'tableShowExport'  => true,
-            'tableColumnFilters' => false,
             'tableStriped'     => true,
             'conditionalRules' => [],
             'fillArea'         => false,
@@ -397,7 +423,6 @@ class DataHandler {
         $sanitized['showDataLabels']   = isset( $settings['showDataLabels'] ) ? (bool) $settings['showDataLabels'] : $defaults['showDataLabels'];
         $sanitized['tableShowSearch']  = isset( $settings['tableShowSearch'] ) ? (bool) $settings['tableShowSearch'] : $defaults['tableShowSearch'];
         $sanitized['tableShowExport']  = isset( $settings['tableShowExport'] ) ? (bool) $settings['tableShowExport'] : $defaults['tableShowExport'];
-        $sanitized['tableColumnFilters'] = isset( $settings['tableColumnFilters'] ) ? (bool) $settings['tableColumnFilters'] : $defaults['tableColumnFilters'];
         $sanitized['tableStriped']     = isset( $settings['tableStriped'] ) ? (bool) $settings['tableStriped'] : $defaults['tableStriped'];
         $sanitized['fillArea']         = isset( $settings['fillArea'] ) ? (bool) $settings['fillArea'] : $defaults['fillArea'];
         $sanitized['beginAtZero']      = isset( $settings['beginAtZero'] ) ? (bool) $settings['beginAtZero'] : $defaults['beginAtZero'];
@@ -407,12 +432,6 @@ class DataHandler {
         $sanitized['view']    = isset( $settings['view'] ) && in_array( $settings['view'], $valid_views, true )
             ? $settings['view']
             : $defaults['view'];
-
-        // Mode.
-        $valid_modes          = [ 'value', 'percent' ];
-        $sanitized['mode']    = isset( $settings['mode'] ) && in_array( $settings['mode'], $valid_modes, true )
-            ? $settings['mode']
-            : $defaults['mode'];
 
         // Chart column selector.
         $sanitized['chartLabelCol']  = isset( $settings['chartLabelCol'] ) ? absint( $settings['chartLabelCol'] ) : $defaults['chartLabelCol'];
@@ -424,16 +443,20 @@ class DataHandler {
         $sanitized['xAxisLabel']     = isset( $settings['xAxisLabel'] ) ? sanitize_text_field( $settings['xAxisLabel'] ) : $defaults['xAxisLabel'];
         $sanitized['yAxisLabel']     = isset( $settings['yAxisLabel'] ) ? sanitize_text_field( $settings['yAxisLabel'] ) : $defaults['yAxisLabel'];
 
-        // Legend position.
-        $valid_positions                = [ 'top', 'bottom', 'left', 'right' ];
-        $sanitized['legendPosition']    = isset( $settings['legendPosition'] ) && in_array( $settings['legendPosition'], $valid_positions, true )
-            ? $settings['legendPosition']
-            : $defaults['legendPosition'];
-
-        // Series colors (object).
-        $sanitized['seriesColors'] = isset( $settings['seriesColors'] ) && ( is_array( $settings['seriesColors'] ) || is_object( $settings['seriesColors'] ) )
-            ? $settings['seriesColors']
-            : $defaults['seriesColors'];
+        // Series colors (object) — sanitize each value as hex color.
+        if ( isset( $settings['seriesColors'] ) && ( is_array( $settings['seriesColors'] ) || is_object( $settings['seriesColors'] ) ) ) {
+            $clean_colors = [];
+            foreach ( (array) $settings['seriesColors'] as $key => $color ) {
+                $key   = sanitize_key( $key );
+                $color = sanitize_hex_color( (string) $color );
+                if ( $key !== '' && $color ) {
+                    $clean_colors[ $key ] = $color;
+                }
+            }
+            $sanitized['seriesColors'] = (object) $clean_colors;
+        } else {
+            $sanitized['seriesColors'] = $defaults['seriesColors'];
+        }
 
         // Table rows per page.
         $sanitized['tableRowsPerPage'] = isset( $settings['tableRowsPerPage'] ) ? absint( $settings['tableRowsPerPage'] ) : $defaults['tableRowsPerPage'];
@@ -448,10 +471,30 @@ class DataHandler {
         // Pie max width (0 = no limit).
         $sanitized['pieMaxWidth'] = isset( $settings['pieMaxWidth'] ) ? absint( $settings['pieMaxWidth'] ) : $defaults['pieMaxWidth'];
 
-        // Conditional rules.
-        $sanitized['conditionalRules'] = isset( $settings['conditionalRules'] ) && is_array( $settings['conditionalRules'] )
-            ? $settings['conditionalRules']
-            : $defaults['conditionalRules'];
+        // Conditional rules — sanitize each rule.
+        $sanitized['conditionalRules'] = [];
+        if ( isset( $settings['conditionalRules'] ) && is_array( $settings['conditionalRules'] ) ) {
+            $valid_operators = [ '>', '<', '>=', '<=', '==', '!=', 'between', 'contains' ];
+            foreach ( $settings['conditionalRules'] as $rule ) {
+                if ( ! is_array( $rule ) ) {
+                    continue;
+                }
+                $operator = isset( $rule['operator'] ) && in_array( $rule['operator'], $valid_operators, true )
+                    ? $rule['operator']
+                    : '>';
+                $sanitized['conditionalRules'][] = [
+                    'colIdx'   => isset( $rule['colIdx'] ) ? absint( $rule['colIdx'] ) : 0,
+                    'operator' => $operator,
+                    'value'    => isset( $rule['value'] ) ? sanitize_text_field( (string) $rule['value'] ) : '',
+                    'value2'   => isset( $rule['value2'] ) ? sanitize_text_field( (string) $rule['value2'] ) : '',
+                    'style'    => [
+                        'bg'   => isset( $rule['style']['bg'] ) ? sanitize_hex_color( (string) $rule['style']['bg'] ) : '',
+                        'color' => isset( $rule['style']['color'] ) ? sanitize_hex_color( (string) $rule['style']['color'] ) : '',
+                        'bold' => isset( $rule['style']['bold'] ) ? (bool) $rule['style']['bold'] : false,
+                    ],
+                ];
+            }
+        }
 
         // Group by column (-1 = disabled).
         $sanitized['groupByCol'] = isset( $settings['groupByCol'] ) ? intval( $settings['groupByCol'] ) : $defaults['groupByCol'];

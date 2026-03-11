@@ -86,7 +86,9 @@ class Ajax {
      * Save chart AJAX handler.
      */
     public function save_chart(): void {
-        $this->verify_request();
+        if ( ! $this->verify_request() ) {
+            return;
+        }
 
         $chart_id = isset( $_POST['chart_id'] ) ? absint( $_POST['chart_id'] ) : 0;
         $title    = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
@@ -173,7 +175,9 @@ class Ajax {
      * Load chart AJAX handler.
      */
     public function load_chart(): void {
-        $this->verify_request();
+        if ( ! $this->verify_request() ) {
+            return;
+        }
 
         $chart_id = isset( $_POST['chart_id'] ) ? absint( $_POST['chart_id'] ) : 0;
 
@@ -207,7 +211,9 @@ class Ajax {
      * Delete chart AJAX handler.
      */
     public function delete_chart(): void {
-        $this->verify_request();
+        if ( ! $this->verify_request() ) {
+            return;
+        }
 
         $chart_id = isset( $_POST['chart_id'] ) ? absint( $_POST['chart_id'] ) : 0;
 
@@ -245,7 +251,9 @@ class Ajax {
      * Get all charts AJAX handler.
      */
     public function get_charts(): void {
-        $this->verify_request();
+        if ( ! $this->verify_request() ) {
+            return;
+        }
 
         $charts = $this->data_handler->get_all_charts();
 

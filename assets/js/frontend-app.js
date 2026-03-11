@@ -226,66 +226,71 @@
             contentArea.style.margin = '0 auto';
         }
 
-        new Chart(ctx, {
-            type: settings.chartType === 'combo' ? 'bar' : (settings.chartType || 'bar'),
-            data: { labels: labels, datasets: datasets },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: isPie ? {} : {
-                    x: {
-                        stacked: settings.stacked || false,
-                        title: {
-                            display: !!settings.xAxisLabel,
-                            text: settings.xAxisLabel || ''
+        try {
+            new Chart(ctx, {
+                type: settings.chartType === 'combo' ? 'bar' : (settings.chartType || 'bar'),
+                data: { labels: labels, datasets: datasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: isPie ? {} : {
+                        x: {
+                            stacked: settings.stacked || false,
+                            title: {
+                                display: !!settings.xAxisLabel,
+                                text: settings.xAxisLabel || ''
+                            }
+                        },
+                        y: {
+                            stacked: settings.stacked || false,
+                            beginAtZero: settings.beginAtZero !== false,
+                            title: {
+                                display: !!settings.yAxisLabel,
+                                text: settings.yAxisLabel || ''
+                            }
                         }
                     },
-                    y: {
-                        stacked: settings.stacked || false,
-                        beginAtZero: settings.beginAtZero !== false,
-                        title: {
-                            display: !!settings.yAxisLabel,
-                            text: settings.yAxisLabel || ''
-                        }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: settings.showLegend !== false,
-                        position: 'bottom',
-                        labels: {
-                            usePointStyle: true,
-                            pointStyle: 'rectRounded',
-                            padding: 16,
-                            font: { size: 12 }
-                        }
-                    },
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                var label = context.label || '';
-                                var value = context.raw;
+                    plugins: {
+                        legend: {
+                            display: settings.showLegend !== false,
+                            position: 'bottom',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'rectRounded',
+                                padding: 16,
+                                font: { size: 12 }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    var label = context.label || '';
+                                    var value = context.raw;
 
-                                if (context.chart.config.type === 'pie' || context.chart.config.type === 'doughnut') {
-                                    var dataset = context.dataset;
-                                    var meta = context.chart.getDatasetMeta(context.datasetIndex);
-                                    var total = meta.total;
-                                    if (!total) {
-                                        total = dataset.data.reduce(function(acc, val) {
-                                            return acc + (parseFloat(val) || 0);
-                                        }, 0);
+                                    if (context.chart.config.type === 'pie' || context.chart.config.type === 'doughnut') {
+                                        var dataset = context.dataset;
+                                        var meta = context.chart.getDatasetMeta(context.datasetIndex);
+                                        var total = meta.total;
+                                        if (!total) {
+                                            total = dataset.data.reduce(function(acc, val) {
+                                                return acc + (parseFloat(val) || 0);
+                                            }, 0);
+                                        }
+                                        var percentage = parseFloat((value / total * 100).toFixed(1));
+                                        return value + ' (' + percentage + '%)';
                                     }
-                                    var percentage = parseFloat((value / total * 100).toFixed(1));
-                                    return value + ' (' + percentage + '%)';
-                                }
 
-                                return label + ': ' + value;
+                                    return label + ': ' + value;
+                                }
                             }
                         }
                     }
                 }
-            }
-        });
+            });
+        } catch (e) {
+            console.error('LiteStats: Chart render failed', e);
+            canvas.parentNode.innerHTML = '<div style="padding:20px;color:#dc2626;text-align:center;">Chart rendering error</div>';
+        }
 
     }
 
