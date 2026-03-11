@@ -129,18 +129,52 @@
         var ctx = canvas.getContext('2d');
         var palette = themes[settings.theme] || themes['default'];
         var labelCol = settings.chartLabelCol || 0;
+        var groupCol = (typeof settings.groupByCol !== 'undefined') ? settings.groupByCol : -1;
+        var isGroupFiltered = !!chartData._groupFiltered;
 
-        // When a specific group is selected and label col is the group col, shift to next column
-        if (chartData._groupFiltered && labelCol === settings.groupByCol) {
+        // When a specific group is selected and label col is the group col, shift labels
+        if (isGroupFiltered && groupCol >= 0 && labelCol === groupCol) {
             for (var li = 0; li < cols.length; li++) {
-                if (li !== settings.groupByCol) { labelCol = li; break; }
+                if (li !== groupCol) { labelCol = li; break; }
             }
+        }
+
+        // When showing "All" and labelCol === groupByCol, aggregate rows by group
+        var needsAggregation = !isGroupFiltered && groupCol >= 0 && labelCol === groupCol;
+        var chartRows = rows;
+        if (needsAggregation) {
+            var groupMap = {};
+            var groupOrder = [];
+            rows.forEach(function(row) {
+                var key = String(row[labelCol] || '');
+                if (!groupMap[key]) {
+                    groupMap[key] = [];
+                    groupOrder.push(key);
+                }
+                groupMap[key].push(row);
+            });
+            // Sum numeric values per group
+            chartRows = groupOrder.map(function(key) {
+                var groupRows = groupMap[key];
+                var aggregated = cols.map(function(col, ci) {
+                    if (ci === labelCol) return key;
+                    if (col.type === 'string' || col.type === 'date') return groupRows[0][ci];
+                    var sum = 0;
+                    groupRows.forEach(function(r) {
+                        var v = r[ci];
+                        if (typeof v === 'string') v = v.replace(/[$,%]/g, '');
+                        sum += parseFloat(v) || 0;
+                    });
+                    return sum;
+                });
+                return aggregated;
+            });
         }
 
         var dataCols = getDataColumnIndices(cols, settings);
 
         // Labels
-        var labels = rows.map(function(r) { return r[labelCol]; });
+        var labels = chartRows.map(function(r) { return r[labelCol]; });
         var datasets = [];
         var colorIdx = 0;
 
@@ -162,7 +196,7 @@
             datasets.push({
                 type: type === 'combo' ? 'bar' : type,
                 label: col.name,
-                data: rows.map(function(r) {
+                data: chartRows.map(function(r) {
                     var val = r[colIdx];
                     if (typeof val === 'string') {
                         val = val.replace(/[$,%]/g, '');
