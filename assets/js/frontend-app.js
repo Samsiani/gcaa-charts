@@ -613,8 +613,6 @@
 
         // "All" button in header
         var allBtn = sidebar.querySelector('.litestats-group-all');
-        var allCount = allBtn ? allBtn.querySelector('.litestats-group-count') : null;
-        if (allCount) allCount.textContent = rows.length;
 
         // Build sidebar list (groups only, no "All")
         var html = '';
