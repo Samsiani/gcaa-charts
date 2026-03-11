@@ -261,6 +261,15 @@ if ( ! $is_new ) {
                     </label>
                 </div>
 
+                <!-- Group By Column -->
+                <div class="config-row" style="margin-top:10px;">
+                    <label for="groupByCol"><?php esc_html_e( 'Group By Column', 'litestats-pro' ); ?></label>
+                    <select class="btn" id="groupByCol" style="width:100%">
+                        <option value="-1"><?php esc_html_e( 'None', 'litestats-pro' ); ?></option>
+                    </select>
+                    <small class="format-hint"><?php esc_html_e( 'Creates a sidebar menu from unique values in the selected column.', 'litestats-pro' ); ?></small>
+                </div>
+
                 <!-- Per-series colors -->
                 <div class="config-row" style="margin-top:10px;">
                     <label><?php esc_html_e( 'Series Colors', 'litestats-pro' ); ?></label>

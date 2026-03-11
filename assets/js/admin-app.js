@@ -155,7 +155,8 @@
                 conditionalRules: [],
                 fillArea: false,
                 lineTension: 0.4,
-                beginAtZero: true
+                beginAtZero: true,
+                groupByCol: -1
             };
         },
 
@@ -297,6 +298,12 @@
             });
             $('#beginAtZero').on('change', function() {
                 self.app.settings.beginAtZero = this.checked;
+                self.updateChartRender();
+            });
+
+            // Group by column
+            $('#groupByCol').on('change', function() {
+                self.app.settings.groupByCol = parseInt(this.value, 10);
                 self.updateChartRender();
             });
 
@@ -664,6 +671,14 @@
             $('#showDataLabels').prop('checked', settings.showDataLabels || false);
 
             this.updateSeriesColors();
+
+            // Group by column dropdown
+            var groupHtml = '<option value="-1">None</option>';
+            cols.forEach(function(col, idx) {
+                var sel = (settings.groupByCol === idx) ? ' selected' : '';
+                groupHtml += '<option value="' + idx + '"' + sel + '>' + col.name + '</option>';
+            });
+            $('#groupByCol').html(groupHtml);
         },
 
         /**

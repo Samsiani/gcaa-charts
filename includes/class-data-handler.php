@@ -310,6 +310,7 @@ class DataHandler {
             'fillArea'         => false,
             'lineTension'      => 0.4,
             'beginAtZero'      => true,
+            'groupByCol'       => -1,
         ];
     }
 
@@ -445,6 +446,9 @@ class DataHandler {
         $sanitized['conditionalRules'] = isset( $settings['conditionalRules'] ) && is_array( $settings['conditionalRules'] )
             ? $settings['conditionalRules']
             : $defaults['conditionalRules'];
+
+        // Group by column (-1 = disabled).
+        $sanitized['groupByCol'] = isset( $settings['groupByCol'] ) ? intval( $settings['groupByCol'] ) : $defaults['groupByCol'];
 
         return $sanitized;
     }

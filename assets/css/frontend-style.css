@@ -18,6 +18,81 @@
     box-sizing: border-box;
 }
 
+/* Group Layout */
+.litestats-container.litestats-has-groups {
+    display: flex;
+    gap: 0;
+}
+
+.litestats-group-sidebar {
+    width: 220px;
+    min-width: 220px;
+    background: #f8f9fa;
+    border-right: 1px solid #e0e0e0;
+    border-radius: 4px 0 0 4px;
+    overflow-y: auto;
+    max-height: 600px;
+}
+
+.litestats-group-title {
+    padding: 12px 15px;
+    font-weight: 600;
+    font-size: 13px;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.litestats-group-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.litestats-group-item {
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid #eee;
+    font-size: 13px;
+    color: #444;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.15s, color 0.15s;
+}
+
+.litestats-group-item:hover {
+    background: #e8f0fe;
+    color: #1a56db;
+}
+
+.litestats-group-item.active {
+    background: #2271b1;
+    color: #fff;
+    font-weight: 500;
+}
+
+.litestats-group-item.active .litestats-group-count {
+    background: rgba(255,255,255,0.25);
+    color: #fff;
+}
+
+.litestats-group-count {
+    font-size: 11px;
+    background: #e0e0e0;
+    color: #666;
+    padding: 2px 7px;
+    border-radius: 10px;
+    min-width: 22px;
+    text-align: center;
+}
+
+.litestats-has-groups .litestats-content-area {
+    flex: 1;
+    min-width: 0;
+}
+
 /* Canvas */
 .litestats-canvas {
     width: 100% !important;
@@ -247,6 +322,38 @@
 
 /* Responsive */
 @media screen and (max-width: 768px) {
+    .litestats-container.litestats-has-groups {
+        flex-direction: column;
+    }
+
+    .litestats-group-sidebar {
+        width: 100%;
+        min-width: 100%;
+        max-height: none;
+        border-right: none;
+        border-bottom: 1px solid #e0e0e0;
+        border-radius: 4px 4px 0 0;
+    }
+
+    .litestats-group-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 8px;
+    }
+
+    .litestats-group-item {
+        border-bottom: none;
+        border-radius: 20px;
+        padding: 6px 12px;
+        font-size: 12px;
+        background: #eee;
+    }
+
+    .litestats-group-item.active {
+        background: #2271b1;
+    }
+
     .litestats-table-wrapper {
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;

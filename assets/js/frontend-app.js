@@ -591,6 +591,104 @@
     }
 
     /**
+     * Initialize group sidebar for a container.
+     * Extracts unique values from groupByCol, renders sidebar items,
+     * and filters data on click before re-rendering chart/table.
+     */
+    function initGroupSidebar(containerId, chartData) {
+        var container = document.getElementById(containerId);
+        if (!container) return;
+
+        var settings = chartData.settings || {};
+        var config = chartData.config || {};
+        var groupCol = settings.groupByCol;
+
+        if (typeof groupCol === 'undefined' || groupCol < 0) return;
+
+        var rows = config.rows || [];
+        var sidebar = container.querySelector('.litestats-group-sidebar');
+        if (!sidebar) return;
+
+        var list = sidebar.querySelector('.litestats-group-list');
+        if (!list) return;
+
+        // Extract unique group values preserving order
+        var seen = {};
+        var groups = [];
+        rows.forEach(function(row) {
+            var val = String(row[groupCol] || '');
+            if (!seen[val]) {
+                seen[val] = true;
+                groups.push(val);
+            }
+        });
+
+        // Build sidebar list
+        var strings = (typeof liteStatsProFrontend !== 'undefined' && liteStatsProFrontend.strings) ? liteStatsProFrontend.strings : {};
+        var allLabel = strings.all || 'All';
+        var html = '<li class="litestats-group-item active" data-group="__all__">' + escapeHtml(allLabel) + ' <span class="litestats-group-count">' + rows.length + '</span></li>';
+        groups.forEach(function(g) {
+            var count = rows.filter(function(r) { return String(r[groupCol] || '') === g; }).length;
+            html += '<li class="litestats-group-item" data-group="' + escapeHtml(g) + '">' + escapeHtml(g) + ' <span class="litestats-group-count">' + count + '</span></li>';
+        });
+        list.innerHTML = html;
+
+        // Click handler
+        list.querySelectorAll('.litestats-group-item').forEach(function(li) {
+            li.addEventListener('click', function() {
+                // Update active state
+                list.querySelectorAll('.litestats-group-item').forEach(function(el) { el.classList.remove('active'); });
+                this.classList.add('active');
+
+                var group = this.dataset.group;
+                var filteredRows;
+                if (group === '__all__') {
+                    filteredRows = rows;
+                } else {
+                    filteredRows = rows.filter(function(r) { return String(r[groupCol] || '') === group; });
+                }
+
+                // Create filtered chart data
+                var filteredData = {
+                    id: chartData.id,
+                    config: { cols: config.cols, rows: filteredRows },
+                    settings: settings
+                };
+
+                // Clear and re-render content area
+                var contentArea = container.querySelector('.litestats-content-area');
+                if (!contentArea) return;
+
+                if (settings.view === 'table') {
+                    // Reset table content
+                    var tw = contentArea.querySelector('.litestats-table-wrapper');
+                    if (tw) {
+                        var thead = tw.querySelector('thead');
+                        var tbody = tw.querySelector('tbody');
+                        var pagination = tw.querySelector('.litestats-pagination');
+                        if (thead) thead.innerHTML = '';
+                        if (tbody) tbody.innerHTML = '';
+                        if (pagination) pagination.innerHTML = '';
+                    }
+                    renderTable(containerId, filteredData);
+                } else {
+                    // Destroy existing chart canvas and create new one
+                    var oldCanvas = contentArea.querySelector('.litestats-canvas');
+                    if (oldCanvas) {
+                        // Get existing Chart instance and destroy it
+                        var existingChart = Chart.getChart(oldCanvas);
+                        if (existingChart) existingChart.destroy();
+                        var newCanvas = document.createElement('canvas');
+                        newCanvas.className = 'litestats-canvas';
+                        oldCanvas.parentNode.replaceChild(newCanvas, oldCanvas);
+                    }
+                    renderChart(containerId, filteredData);
+                }
+            });
+        });
+    }
+
+    /**
      * Initialize all charts on the page.
      */
     function initCharts() {
@@ -606,6 +704,9 @@
             } else {
                 renderChart(containerId, chartData);
             }
+
+            // Initialize group sidebar if groupByCol is set
+            initGroupSidebar(containerId, chartData);
         });
     }
 

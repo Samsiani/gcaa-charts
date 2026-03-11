@@ -111,6 +111,7 @@ class Shortcode {
                 'rows_per_page'  => 0,
                 'show_export'    => '',
                 'show_filters'   => '',
+                'group_by'       => '',
             ],
             $atts,
             'litestats'
@@ -155,6 +156,9 @@ class Shortcode {
         if ( '' !== $atts['show_filters'] ) {
             $settings['tableColumnFilters'] = filter_var( $atts['show_filters'], FILTER_VALIDATE_BOOLEAN );
         }
+        if ( '' !== $atts['group_by'] ) {
+            $settings['groupByCol'] = intval( $atts['group_by'] );
+        }
 
         // Generate unique ID for this chart instance.
         $instance_id = 'litestats-chart-' . $chart_id . '-' . wp_rand( 1000, 9999 );
@@ -180,32 +184,41 @@ class Shortcode {
 
         ob_start();
         ?>
-        <div class="litestats-container" id="<?php echo esc_attr( $instance_id ); ?>" style="width: <?php echo $width; ?>; <?php echo 'table' !== $settings['view'] ? 'height: ' . $height . ';' : ''; ?>">
-            <?php if ( 'table' === $settings['view'] ) : ?>
-                <div class="litestats-table-wrapper">
-                    <div class="litestats-table-toolbar">
-                        <?php if ( $settings['tableShowSearch'] ) : ?>
-                            <input type="text" class="litestats-search" placeholder="<?php esc_attr_e( 'Search...', 'litestats-pro' ); ?>" data-target="<?php echo esc_attr( $instance_id ); ?>">
-                        <?php endif; ?>
-                        <?php if ( $settings['tableShowExport'] ) : ?>
-                            <div class="litestats-export-bar">
-                                <button class="litestats-btn litestats-export-csv" data-target="<?php echo esc_attr( $instance_id ); ?>"><?php esc_html_e( 'Export CSV', 'litestats-pro' ); ?></button>
-                                <button class="litestats-btn litestats-print" data-target="<?php echo esc_attr( $instance_id ); ?>"><?php esc_html_e( 'Print', 'litestats-pro' ); ?></button>
-                            </div>
-                        <?php endif; ?>
-                    </div>
-                    <?php if ( $settings['tableColumnFilters'] ) : ?>
-                        <div class="litestats-column-filters"></div>
-                    <?php endif; ?>
-                    <table class="litestats-table<?php echo $settings['tableStriped'] ? ' litestats-striped' : ''; ?>">
-                        <thead></thead>
-                        <tbody></tbody>
-                    </table>
-                    <div class="litestats-pagination"></div>
+        <?php $has_group = isset( $settings['groupByCol'] ) && $settings['groupByCol'] >= 0; ?>
+        <div class="litestats-container<?php echo $has_group ? ' litestats-has-groups' : ''; ?>" id="<?php echo esc_attr( $instance_id ); ?>" style="width: <?php echo $width; ?>; <?php echo 'table' !== $settings['view'] && ! $has_group ? 'height: ' . $height . ';' : ''; ?>">
+            <?php if ( $has_group ) : ?>
+                <div class="litestats-group-sidebar">
+                    <div class="litestats-group-title"><?php esc_html_e( 'Groups', 'litestats-pro' ); ?></div>
+                    <ul class="litestats-group-list"></ul>
                 </div>
-            <?php else : ?>
-                <canvas class="litestats-canvas"></canvas>
             <?php endif; ?>
+            <div class="litestats-content-area" <?php echo ! $has_group && 'table' !== $settings['view'] ? 'style="height:' . $height . '"' : ''; ?>>
+                <?php if ( 'table' === $settings['view'] ) : ?>
+                    <div class="litestats-table-wrapper">
+                        <div class="litestats-table-toolbar">
+                            <?php if ( $settings['tableShowSearch'] ) : ?>
+                                <input type="text" class="litestats-search" placeholder="<?php esc_attr_e( 'Search...', 'litestats-pro' ); ?>" data-target="<?php echo esc_attr( $instance_id ); ?>">
+                            <?php endif; ?>
+                            <?php if ( $settings['tableShowExport'] ) : ?>
+                                <div class="litestats-export-bar">
+                                    <button class="litestats-btn litestats-export-csv" data-target="<?php echo esc_attr( $instance_id ); ?>"><?php esc_html_e( 'Export CSV', 'litestats-pro' ); ?></button>
+                                    <button class="litestats-btn litestats-print" data-target="<?php echo esc_attr( $instance_id ); ?>"><?php esc_html_e( 'Print', 'litestats-pro' ); ?></button>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        <?php if ( $settings['tableColumnFilters'] ) : ?>
+                            <div class="litestats-column-filters"></div>
+                        <?php endif; ?>
+                        <table class="litestats-table<?php echo $settings['tableStriped'] ? ' litestats-striped' : ''; ?>">
+                            <thead></thead>
+                            <tbody></tbody>
+                        </table>
+                        <div class="litestats-pagination"></div>
+                    </div>
+                <?php else : ?>
+                    <canvas class="litestats-canvas"></canvas>
+                <?php endif; ?>
+            </div>
         </div>
         <?php
         return ob_get_clean();
