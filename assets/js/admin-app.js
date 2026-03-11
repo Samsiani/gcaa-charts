@@ -157,6 +157,7 @@
                 fillArea: false,
                 lineTension: 0.4,
                 beginAtZero: true,
+                pieMaxWidth: 0,
                 groupByCol: -1
             };
         },
@@ -303,6 +304,10 @@
             });
             $('#beginAtZero').on('change', function() {
                 self.app.settings.beginAtZero = this.checked;
+                self.updateChartRender();
+            });
+            $('#pieMaxWidth').on('change', function() {
+                self.app.settings.pieMaxWidth = parseInt(this.value, 10) || 0;
                 self.updateChartRender();
             });
 
@@ -619,6 +624,8 @@
             var type = this.app.settings.chartType;
             var show = (type === 'line' || type === 'combo');
             $('#lineChartOptions').toggle(show);
+            var isPie = (type === 'pie' || type === 'doughnut');
+            $('#pieMaxWidthRow').toggle(isPie);
         },
 
         /**
@@ -629,6 +636,7 @@
             $('#fillArea').prop('checked', s.fillArea);
             $('#lineTension').val(s.lineTension);
             $('#beginAtZero').prop('checked', s.beginAtZero);
+            $('#pieMaxWidth').val(s.pieMaxWidth || 0);
             this.toggleLineOptions();
         },
 

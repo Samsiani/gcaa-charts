@@ -256,6 +256,13 @@ if ( ! $is_new ) {
                     </div>
                 </div>
 
+                <!-- Pie/Doughnut max width -->
+                <div class="config-row" id="pieMaxWidthRow" style="margin-top:10px;display:none;">
+                    <label for="pieMaxWidth"><?php esc_html_e( 'Pie Max Width (px)', 'litestats-pro' ); ?></label>
+                    <input type="number" class="btn" id="pieMaxWidth" value="0" min="0" max="2000" step="10" style="width:100%" placeholder="<?php esc_attr_e( '0 = no limit', 'litestats-pro' ); ?>">
+                    <small class="format-hint"><?php esc_html_e( '0 = no limit. e.g. 400', 'litestats-pro' ); ?></small>
+                </div>
+
                 <!-- Y-axis options -->
                 <div class="config-row" style="margin-top:10px;">
                     <label class="checkbox-label">

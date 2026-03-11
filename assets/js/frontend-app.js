@@ -219,6 +219,13 @@
 
         var isPie = settings.chartType === 'pie' || settings.chartType === 'doughnut';
 
+        // Apply pie max width constraint
+        if (isPie && settings.pieMaxWidth && settings.pieMaxWidth > 0) {
+            var contentArea = container.querySelector('.litestats-content-area') || container;
+            contentArea.style.maxWidth = settings.pieMaxWidth + 'px';
+            contentArea.style.margin = '0 auto';
+        }
+
         new Chart(ctx, {
             type: settings.chartType === 'combo' ? 'bar' : (settings.chartType || 'bar'),
             data: { labels: labels, datasets: datasets },

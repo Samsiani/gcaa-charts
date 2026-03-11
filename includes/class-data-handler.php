@@ -311,6 +311,7 @@ class DataHandler {
             'fillArea'         => false,
             'lineTension'      => 0.4,
             'beginAtZero'      => true,
+            'pieMaxWidth'      => 0,
             'groupByCol'       => -1,
         ];
     }
@@ -443,6 +444,9 @@ class DataHandler {
         // Line tension.
         $sanitized['lineTension'] = isset( $settings['lineTension'] ) ? (float) $settings['lineTension'] : $defaults['lineTension'];
         $sanitized['lineTension'] = max( 0, min( 1, $sanitized['lineTension'] ) );
+
+        // Pie max width (0 = no limit).
+        $sanitized['pieMaxWidth'] = isset( $settings['pieMaxWidth'] ) ? absint( $settings['pieMaxWidth'] ) : $defaults['pieMaxWidth'];
 
         // Conditional rules.
         $sanitized['conditionalRules'] = isset( $settings['conditionalRules'] ) && is_array( $settings['conditionalRules'] )
