@@ -98,6 +98,7 @@ class Shortcode {
                 'id'     => 0,
                 'type'   => '', // Override chart type.
                 'theme'  => '', // Override theme.
+                'view'   => '', // Override view: 'chart' or 'table'.
                 'width'  => '100%',
                 'height' => '400px',
             ],
@@ -128,6 +129,9 @@ class Shortcode {
         }
         if ( ! empty( $atts['theme'] ) ) {
             $settings['theme'] = sanitize_key( $atts['theme'] );
+        }
+        if ( ! empty( $atts['view'] ) && in_array( $atts['view'], [ 'chart', 'table' ], true ) ) {
+            $settings['view'] = $atts['view'];
         }
 
         // Generate unique ID for this chart instance.
