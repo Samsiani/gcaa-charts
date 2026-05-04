@@ -39,6 +39,13 @@ class Admin {
     private string $hook_suffix = '';
 
     /**
+     * All registered plugin page hook suffixes.
+     *
+     * @var array<string>
+     */
+    private array $page_hooks = [];
+
+    /**
      * Constructor.
      */
     public function __construct() {
@@ -83,7 +90,9 @@ class Admin {
             30
         );
 
-        add_submenu_page(
+        $this->page_hooks[] = $this->hook_suffix;
+
+        $this->page_hooks[] = add_submenu_page(
             self::PAGE_SLUG,
             __( 'All Charts', 'litestats-pro' ),
             __( 'All Charts', 'litestats-pro' ),
@@ -92,7 +101,7 @@ class Admin {
             [ $this, 'render_admin_page' ]
         );
 
-        add_submenu_page(
+        $this->page_hooks[] = add_submenu_page(
             self::PAGE_SLUG,
             __( 'Add New Chart', 'litestats-pro' ),
             __( 'Add New', 'litestats-pro' ),
@@ -101,7 +110,7 @@ class Admin {
             [ $this, 'render_editor_page' ]
         );
 
-        add_submenu_page(
+        $this->page_hooks[] = add_submenu_page(
             null,
             __( 'Edit Chart', 'litestats-pro' ),
             __( 'Edit Chart', 'litestats-pro' ),
@@ -109,6 +118,8 @@ class Admin {
             self::PAGE_SLUG . '-edit',
             [ $this, 'render_editor_page' ]
         );
+
+        $this->page_hooks = array_filter( $this->page_hooks );
     }
 
     /**
@@ -117,13 +128,7 @@ class Admin {
      * @param string $hook_suffix Current admin page hook suffix.
      */
     public function enqueue_admin_assets( string $hook_suffix ): void {
-        $plugin_pages = [
-            'toplevel_page_' . self::PAGE_SLUG,
-            'litestats-pro_page_' . self::PAGE_SLUG . '-new',
-            'admin_page_' . self::PAGE_SLUG . '-edit',
-        ];
-
-        if ( ! in_array( $hook_suffix, $plugin_pages, true ) ) {
+        if ( ! in_array( $hook_suffix, $this->page_hooks, true ) ) {
             return;
         }
 
@@ -143,13 +148,12 @@ class Admin {
             LITESTATS_PRO_VERSION
         );
 
-        // Editor pages only.
-        $editor_pages = [
-            'litestats-pro_page_' . self::PAGE_SLUG . '-new',
-            'admin_page_' . self::PAGE_SLUG . '-edit',
-        ];
+        // Editor pages only — match by ?page= slug so this stays correct
+        // regardless of the parent menu title used to derive hook suffixes.
+        $current_page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+        $editor_slugs = [ self::PAGE_SLUG . '-new', self::PAGE_SLUG . '-edit' ];
 
-        if ( in_array( $hook_suffix, $editor_pages, true ) ) {
+        if ( in_array( $current_page, $editor_slugs, true ) ) {
             // Chart.js CDN (editor only).
             wp_enqueue_script(
                 'chartjs',
