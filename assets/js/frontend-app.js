@@ -263,6 +263,15 @@
                         },
                         tooltip: {
                             callbacks: {
+                                title: function(items) {
+                                    if (!items || !items.length) return '';
+                                    var c = items[0];
+                                    var t = c.chart.config.type;
+                                    if (t === 'pie' || t === 'doughnut') {
+                                        return c.label || '';
+                                    }
+                                    return c.label || '';
+                                },
                                 label: function(context) {
                                     var label = context.label || '';
                                     var value = context.raw;
