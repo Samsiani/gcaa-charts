@@ -74,8 +74,8 @@ class Admin {
      */
     public function register_admin_menu(): void {
         $this->hook_suffix = add_menu_page(
-            __( 'LiteStats Pro', 'litestats-pro' ),
-            __( 'LiteStats Pro', 'litestats-pro' ),
+            __( 'GCAA Charts', 'litestats-pro' ),
+            __( 'GCAA Charts', 'litestats-pro' ),
             'manage_options',
             self::PAGE_SLUG,
             [ $this, 'render_admin_page' ],

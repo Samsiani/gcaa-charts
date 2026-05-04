@@ -27,9 +27,6 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 13px;
     color: var(--litestats-text);
-    margin-left: -20px;
-    margin-right: 0;
-    margin-top: 0;
 }
 
 .litestats-wrap * {
@@ -505,6 +502,13 @@
     position: relative;
     height: 320px;
     width: 100%;
+    overflow: hidden;
+}
+
+.litestats-wrap .chart-wrapper #tablePreviewBox {
+    position: absolute;
+    inset: 0;
+    overflow-y: auto;
 }
 
 .litestats-wrap .chart-controls {

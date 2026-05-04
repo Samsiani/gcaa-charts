@@ -1079,28 +1079,18 @@
                     if (response.success) {
                         self.showToast(liteStatsProAdmin.strings.saveSuccess);
 
-                        // Refresh nonce for next request.
-                        if (response.data.nonce) {
-                            liteStatsProAdmin.nonce = response.data.nonce;
+                        var savedId = response.data && response.data.chart_id ? response.data.chart_id : chartId;
+                        var reloadUrl;
+                        if (!chartId && savedId) {
+                            reloadUrl = window.location.href.replace('litestats-pro-new', 'litestats-pro-edit') +
+                                        '&chart_id=' + savedId;
+                        } else {
+                            reloadUrl = window.location.href;
                         }
 
-                        if (!chartId && response.data.chart_id) {
-                            liteStatsProAdmin.chartId = response.data.chart_id;
-
-                            var cid = response.data.chart_id;
-                            $('#scCode').html(
-                                '<span class="litestats-sc-badge" data-sc=\'[litestats id="' + cid + '" view="chart"]\'>' +
-                                    '<i class="fas fa-chart-bar"></i> [litestats id="' + cid + '" view="chart"]' +
-                                '</span>' +
-                                '<span class="litestats-sc-badge" data-sc=\'[litestats id="' + cid + '" view="table"]\'>' +
-                                    '<i class="fas fa-table"></i> [litestats id="' + cid + '" view="table"]' +
-                                '</span>'
-                            );
-
-                            var newUrl = window.location.href.replace('litestats-pro-new', 'litestats-pro-edit') +
-                                        '&chart_id=' + response.data.chart_id;
-                            window.history.replaceState({}, '', newUrl);
-                        }
+                        setTimeout(function() {
+                            window.location.href = reloadUrl;
+                        }, 600);
                     } else {
                         self.showToast(response.data.message || liteStatsProAdmin.strings.saveError, false);
                     }
