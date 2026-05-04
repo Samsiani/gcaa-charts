@@ -276,6 +276,15 @@ class Admin {
             wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'litestats-pro' ) );
         }
 
+        // Prevent LiteSpeed / CyberPanel / Cloudflare from caching the editor
+        // HTML. The chart payload is embedded via wp_localize_script, so a
+        // cached page would re-deliver stale data after Save and the editor
+        // would show demo rows until the cache expired.
+        nocache_headers();
+        if ( ! headers_sent() ) {
+            header( 'X-LiteSpeed-Cache-Control: no-cache' );
+        }
+
         include LITESTATS_PRO_PLUGIN_DIR . 'templates/admin-dashboard.php';
     }
 

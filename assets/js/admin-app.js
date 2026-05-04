@@ -1096,9 +1096,13 @@
                         } else {
                             reloadUrl = window.location.href;
                         }
+                        // Cache-buster — defeats LSCache / Cloudflare / browser
+                        // bf-cache so the reload always renders the freshly
+                        // saved chartData.
+                        reloadUrl += (reloadUrl.indexOf('?') === -1 ? '?' : '&') + '_ts=' + Date.now();
 
                         setTimeout(function() {
-                            window.location.href = reloadUrl;
+                            window.location.replace(reloadUrl);
                         }, 600);
                     } else {
                         self.showToast(response.data.message || liteStatsProAdmin.strings.saveError, false);
