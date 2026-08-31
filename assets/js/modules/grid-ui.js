@@ -23,28 +23,79 @@
         dragRowIdx: null,
 
         /**
+         * True when the column TYPE explicitly asks for numeric formatting.
+         *
+         * Mirror of hasExplicitFormat() in frontend-app.js — keep both in sync.
+         * Deliberately ignores props.precision: the precision <select> has no
+         * "none" option and pre-selects 0, so a precision lands on columns whose
+         * author never asked for number formatting, which would switch the
+         * identifier guard below back off.
+         */
+        hasExplicitFormat: function(col) {
+            return col.type === 'currency' || col.type === 'percentage' || col.type === 'formula';
+        },
+
+        /**
+         * Column precision as a number, or null when none is set.
+         * A precision of "0" is a real choice; truthiness checks treated it as unset.
+         */
+        columnPrecision: function(col) {
+            var p = col.props ? col.props.precision : null;
+            if (p === undefined || p === null || p === '') return null;
+            p = parseInt(p, 10);
+            return isNaN(p) ? null : p;
+        },
+
+        /**
          * Format a cell value based on column properties.
+         *
+         * Identifier-style text is shown exactly as authored. A value is only
+         * treated as a number when the WHOLE string parses to a finite number and
+         * that number round-trips back to the same text, so "000001" stays
+         * "000001" (parseFloat would have made it 1) and "4D" stays "4D".
+         *
+         * Mirror of formatValue() in frontend-app.js — keep both in sync. The
+         * frontend copy escapes its output; this one does not, because renderGrid()
+         * escapes before writing the value into the cell input.
          */
         formatValue: function(val, col) {
+            col = col || {};
+
+            var raw = (val === null || val === undefined) ? '' : String(val);
+
             if (col.type === 'string') {
-                return val;
+                return raw;
             }
 
             // Date type
             if (col.type === 'date') {
-                if (!val || val === '') return '';
+                // Test the original value: a stored 0 or false is "no date".
+                if (!val) return '';
                 try {
-                    var d = new Date(val);
+                    var d = new Date(raw);
                     if (!isNaN(d.getTime())) {
                         return d.toLocaleDateString();
                     }
                 } catch(e) { /* fall through */ }
-                return val;
+                return raw;
             }
 
-            var num = parseFloat(val);
-            if (isNaN(num)) {
-                return val;
+            var trimmed = raw.trim();
+            if (trimmed === '') return '';
+
+            var num = Number(trimmed);
+
+            // Not a clean, finite number ("1,234", "12abc", "4D").
+            if (!isFinite(num)) {
+                return raw;
+            }
+
+            var prefix = (col.props && col.props.prefix) ? col.props.prefix : '';
+            var suffixStr = (col.props && col.props.suffix) ? col.props.suffix : '';
+
+            // Text a number cannot round-trip: "000001", "007", "+5", "1e3", "01.50".
+            if (String(num) !== trimmed && !this.hasExplicitFormat(col)) {
+                return prefix + raw + suffixStr;
             }
 
             // Percentage display for formula columns
@@ -54,33 +105,35 @@
 
             // Currency: add thousands separator
             if (col.type === 'currency') {
-                var symbol = (col.props && col.props.currencySymbol) ? col.props.currencySymbol : ((col.props && col.props.prefix) ? col.props.prefix : '$');
-                var precision = (col.props && col.props.precision) ? parseInt(col.props.precision, 10) : 2;
+                var symbol = (col.props && col.props.currencySymbol) ? col.props.currencySymbol : (prefix || '$');
+                var precision = this.columnPrecision(col);
+                if (precision === null) precision = 2;
                 return symbol + num.toLocaleString(undefined, { minimumFractionDigits: precision, maximumFractionDigits: precision });
             }
 
             // Percentage type
             if (col.type === 'percentage') {
-                var pPrecision = (col.props && col.props.precision) ? parseInt(col.props.precision, 10) : 1;
-                var suffix = (col.props && col.props.suffix) ? col.props.suffix : '%';
-                return num.toFixed(pPrecision) + suffix;
+                var pPrecision = this.columnPrecision(col);
+                if (pPrecision === null) pPrecision = 1;
+                var pSuffix = suffixStr || '%';
+                return num.toFixed(pPrecision) + pSuffix;
             }
 
-            var precision = (col.props && col.props.precision) ? col.props.precision : null;
-            if (precision !== null) {
-                num = num.toFixed(precision);
+            var cPrecision = this.columnPrecision(col);
+            var out;
+            if (cPrecision !== null) {
+                out = num.toFixed(cPrecision);
             } else if (col.type === 'formula' && num !== Math.floor(num)) {
-                num = num.toFixed(2);
+                out = num.toFixed(2);
+            } else {
+                out = String(num);
             }
-
-            var prefix = (col.props && col.props.prefix) ? col.props.prefix : '';
-            var suffixStr = (col.props && col.props.suffix) ? col.props.suffix : '';
 
             if (col.type === 'formula' && col.props && col.props.isPercent) {
                 suffixStr = suffixStr + '%';
             }
 
-            return prefix + num + suffixStr;
+            return prefix + out + suffixStr;
         },
 
         /**
@@ -192,8 +245,11 @@
 
                     var readonly = isFormula ? 'readonly' : '';
 
+                    // data-raw carries the stored value; the input shows the
+                    // formatted one only while the cell is not being edited.
                     bHtml += '<td>' +
-                        '<input class="' + cls + '" value="' + self.escapeHtml(String(displayVal)) + '" ' +
+                        '<input class="' + cls + '" value="' + self.escapeHtml(displayVal) + '" ' +
+                               'data-raw="' + self.escapeHtml(cell) + '" ' +
                                readonly + ' data-row-idx="' + rIdx + '" data-col-idx="' + cIdx + '"' +
                                (cellStyle ? ' style="' + cellStyle + '"' : '') + '>' +
                     '</td>';
@@ -278,14 +334,33 @@
                 el.addEventListener('click', function(e) { e.stopPropagation(); });
             });
 
-            // Cell input changes
+            // Cell input changes.
+            //
+            // The cell shows its formatted value while idle and its stored value
+            // while focused. Without the swap, editing a formatted cell writes the
+            // formatting back as data ("$1,200.00" or a localized date string
+            // becomes the cell value, and the next parse turns it into 0).
             document.querySelectorAll('.cell-input').forEach(function(el) {
+                el.addEventListener('focus', function() {
+                    if (this.readOnly) return;
+                    this.value = this.dataset.raw || '';
+                });
+
                 el.addEventListener('change', function() {
                     var rIdx = parseInt(this.dataset.rowIdx, 10);
                     var cIdx = parseInt(this.dataset.colIdx, 10);
+                    this.dataset.raw = this.value;
                     if (typeof options.onCellChange === 'function') {
                         options.onCellChange(rIdx, cIdx, this.value);
                     }
+                });
+
+                el.addEventListener('blur', function() {
+                    if (this.readOnly) return;
+                    var cIdx = parseInt(this.dataset.colIdx, 10);
+                    var col = app.cols[cIdx];
+                    if (!col) return;
+                    this.value = self.formatValue(this.dataset.raw, col);
                 });
             });
 
@@ -334,11 +409,20 @@
             }
         },
 
+        /**
+         * Escape for use in HTML text *and* in a double-quoted attribute.
+         *
+         * The old div.textContent round trip left quotes intact, so a cell or
+         * column name containing " broke out of the value="" attribute it was
+         * written into.
+         */
         escapeHtml: function(str) {
-            if (typeof str !== 'string') return str;
-            var div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
+            return String(str === null || str === undefined ? '' : str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
     };
 

@@ -136,11 +136,82 @@
 
 /* ─── Table Wrapper ─── */
 .litestats-table-wrapper {
-    overflow: visible;
+    overflow: hidden;
     background: #fff;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     padding: 16px;
+}
+
+/* ─── Table Scroll Region ─── */
+/*
+ * Only the table scrolls sideways. The toolbar and the pagination row are
+ * siblings of this box, so they always match the card's width — previously the
+ * wrapper was overflow:visible and a wide table simply spilled out past the card
+ * while the toolbar and pagination stayed behind at the narrower width.
+ */
+.litestats-table-viewport {
+    position: relative;
+}
+
+.litestats-table-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    background: #fff;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.litestats-table-scroll:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+}
+
+.litestats-table-scroll::-webkit-scrollbar {
+    height: 8px;
+}
+
+.litestats-table-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.litestats-table-scroll::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+
+.litestats-table-scroll::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Fade on the right edge while there is more table to scroll to. */
+.litestats-table-viewport::after {
+    content: '';
+    position: absolute;
+    top: 1px;
+    right: 1px;
+    bottom: 1px;
+    width: 26px;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 4;
+    border-radius: 0 6px 6px 0;
+    background: linear-gradient(to left, rgba(15, 23, 42, 0.13), rgba(15, 23, 42, 0));
+    transition: opacity 0.18s ease;
+}
+
+.litestats-table-viewport.litestats-more-right::after {
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .litestats-table-viewport::after {
+        transition: none;
+    }
 }
 
 /* ─── Table Toolbar ─── */
@@ -303,12 +374,13 @@
 /* ─── Table ─── */
 .litestats-table {
     width: 100%;
+    min-width: 100%;
     border-collapse: separate;
     border-spacing: 0;
     background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 6px;
-    overflow: hidden;
+    border: 0;
+    border-radius: 0;
+    margin: 0;
 }
 
 .litestats-table th {
@@ -322,7 +394,11 @@
     color: #64748b;
     border-bottom: 1px solid #e2e8f0;
     cursor: pointer;
-    white-space: nowrap;
+    /* Wrapping instead of nowrap: ten nowrap Georgian headers forced the table
+       to ~2040px even where far less room was needed. */
+    white-space: normal;
+    min-width: 96px;
+    vertical-align: bottom;
     user-select: none;
     position: relative;
 }
@@ -347,27 +423,48 @@
     border-bottom: 1px solid #f1f5f9;
     font-size: 13px;
     color: #334155;
+    /* Cells carry their own background so the sticky first column stays opaque
+       over the columns scrolling beneath it. Conditional-formatting colours are
+       inline styles and still win. */
+    background: #fff;
 }
 
 .litestats-table tr:last-child td {
     border-bottom: none;
 }
 
-.litestats-table tbody tr {
+.litestats-table tbody tr td {
     transition: background 0.1s ease;
 }
 
-.litestats-table tbody tr:hover {
+.litestats-table tbody tr:hover td {
     background: #f8fafc;
 }
 
 /* Striped rows */
-.litestats-table.litestats-striped tbody tr:nth-child(even) {
+.litestats-table.litestats-striped tbody tr:nth-child(even) td {
     background: #fafbfc;
 }
 
-.litestats-table.litestats-striped tbody tr:nth-child(even):hover {
+.litestats-table.litestats-striped tbody tr:nth-child(even):hover td {
     background: #f1f5f9;
+}
+
+/* Keep the first column pinned while the rest of the table scrolls sideways. */
+.litestats-table th:first-child,
+.litestats-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+}
+
+.litestats-table th:first-child {
+    z-index: 3;
+}
+
+.litestats-more-left .litestats-table th:first-child,
+.litestats-more-left .litestats-table td:first-child {
+    box-shadow: 8px 0 8px -8px rgba(15, 23, 42, 0.28);
 }
 
 /* Numeric alignment */
@@ -377,6 +474,12 @@
 }
 
 /* ─── Pagination ─── */
+/* Only one page of results renders nothing here — without this the wrapper kept
+   a floating border-top under the table. */
+.litestats-pagination:empty {
+    display: none;
+}
+
 .litestats-pagination {
     display: flex;
     justify-content: space-between;
@@ -505,32 +608,17 @@
     }
 
     .litestats-table-wrapper {
-        overflow-x: auto;
-        -webkit-overflow-scrolling: touch;
-        padding: 10px;
-    }
-
-    .litestats-table {
-        min-width: 600px;
-    }
-
-    /* Sticky first column on mobile */
-    .litestats-table th:first-child,
-    .litestats-table td:first-child {
-        position: sticky;
-        left: 0;
-        z-index: 1;
-        background: inherit;
-    }
-
-    .litestats-table th:first-child {
-        background: #f8fafc;
+        padding: 12px;
     }
 
     .litestats-table th,
     .litestats-table td {
-        padding: 8px 10px;
+        padding: 9px 10px;
         font-size: 12px;
+    }
+
+    .litestats-table th {
+        min-width: 84px;
     }
 
     .litestats-table-toolbar {
@@ -542,11 +630,67 @@
         max-width: 100%;
     }
 
-    .litestats-pagination {
-        flex-direction: column;
-        align-items: center;
+    .litestats-export-bar {
+        justify-content: flex-end;
     }
 
+    .litestats-pagination {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .litestats-page-info {
+        text-align: center;
+    }
+
+    .litestats-page-btns {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    /* Comfortable touch targets */
+    .litestats-page-btns .litestats-btn {
+        min-width: 38px;
+        padding: 8px 11px;
+    }
+
+    .litestats-btn-export {
+        height: 38px;
+    }
+
+    .litestats-search {
+        height: 38px;
+        font-size: 16px; /* iOS Safari zooms in on anything below 16px */
+    }
+
+}
+
+/* ─── Responsive: small phones ─── */
+@media screen and (max-width: 480px) {
+    .litestats-table-wrapper {
+        padding: 10px;
+        border-radius: 8px;
+    }
+
+    .litestats-table th,
+    .litestats-table td {
+        padding: 8px;
+    }
+
+    .litestats-table th {
+        min-width: 76px;
+        font-size: 11px;
+        letter-spacing: 0.02em;
+    }
+
+    .litestats-export-bar {
+        gap: 6px;
+    }
+
+    .litestats-export-bar .litestats-btn {
+        flex: 1;
+        justify-content: center;
+    }
 }
 
 /* ─── Print-friendly ─── */
@@ -561,6 +705,23 @@
     .litestats-table-wrapper {
         border: none;
         padding: 0;
+        overflow: visible;
+    }
+
+    /* Print the whole table, not just the slice that happens to be scrolled into view. */
+    .litestats-table-scroll {
+        overflow: visible !important;
+        border: none;
+    }
+
+    .litestats-table-viewport::after {
+        display: none;
+    }
+
+    .litestats-table th:first-child,
+    .litestats-table td:first-child {
+        position: static;
+        box-shadow: none;
     }
 
     .litestats-table {

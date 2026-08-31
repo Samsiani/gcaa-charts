@@ -145,6 +145,30 @@ admin-app.js initState():
 
 > ⚠ **GOTCHA — `update_chart()` truthy ≠ row changed.** `$wpdb->update()` returns `0` for "no rows changed" and `false` for SQL error. The current code does `false !== $result`, which is correct, but: if you ever start branching on "the row was modified", remember `0` is success-but-no-change.
 
+> ⚠ **GOTCHA — numeric-looking strings are identifiers, not quantities.** `sanitize_config()` used to
+> do `if ( is_numeric( $cell ) ) return $cell + 0;`. PHP says `is_numeric("000001")` is true, so a
+> certificate / registration number saved as `000001` was permanently rewritten to the integer `1`
+> **in the database** — same for `007`, `+5`, `1e3`, `01.50` and integers wider than PHP can hold.
+> Since v6.5.6 `DataHandler::sanitize_cell()` only folds a numeric string into a number when the round
+> trip is lossless (`(string)($s + 0) === trim($s)`); everything else keeps its text.
+>
+> The display layer had the same defect twice over: both `formatValue()` implementations called
+> `parseFloat()`, which happily returns `1` for `"000001"` and `4` for `"4D"`. Both now parse with a
+> strict `Number(trimmed)` and fall back to the verbatim text when the value is not a clean finite
+> number, or when the number cannot round-trip back to the same text. Columns that explicitly ask for
+> formatting (`currency`, `percentage`, or an explicit `props.precision`) still format.
+>
+> **The two `formatValue()` copies must stay in sync** — `assets/js/frontend-app.js` (escapes its
+> output) and `assets/js/modules/grid-ui.js` (does not; `renderGrid()` escapes at the call site).
+> `csv-wizard.js` mirrors the same rule at import time in `toNumberOrText()` and refuses to type a
+> leading-zero column as `number`.
+
+> ⚠ **GOTCHA — the admin grid input holds two different values.** `renderGrid()` writes the *formatted*
+> value into `<input value="…">` and the change handler wrote `this.value` straight back as the cell
+> data, so tabbing through a currency or date cell stored `"$1,200.00"` / `"03/12/2021"` as the value.
+> Since v6.5.6 the raw value lives in `data-raw`; `focus` swaps it in, `change` updates `data-raw`, and
+> `blur` swaps the formatted value back.
+
 > ⚠ **GOTCHA — `! empty($config)`.** `update_chart()` only writes the `config` column if `! empty( $config )`. An incoming empty-array config would silently leave the old config in the DB while the save still returns success. Currently fine because the JS always sends a populated object; revisit if you add a "clear data" feature.
 
 ### Render (frontend)
@@ -254,6 +278,25 @@ Pure-DOM table render with column drag/drop, type-change dropdown, per-cell inpu
 - For chart view: instantiates Chart.js with the same tooltip / scale / legend logic mirrored from admin (keep the two in sync).
 - For table view: paginated table, optional search, optional CSV export.
 
+> ⚠ **GOTCHA — only `.litestats-table-scroll` may scroll sideways.** The table markup is
+> `.litestats-table-wrapper` (card) → `.litestats-table-toolbar` + `.litestats-table-viewport` >
+> `.litestats-table-scroll` > `<table>` + `.litestats-pagination`. Up to v6.5.5 the table was a direct
+> child of the wrapper and the wrapper was `overflow: visible` (only becoming `overflow-x: auto` under
+> `max-width: 768px`), so on desktop a wide table simply spilled out past the card while the toolbar and
+> pagination stayed at the card's width — the "table body is wider than the top and bottom" report.
+> If you add anything to the table view, put it **outside** the scroll box or it will scroll away.
+>
+> - The scroll box is created by `Shortcode::render_shortcode()` **and**, defensively, by
+>   `setupTableScroll()` in `frontend-app.js` — a page served from LiteSpeed / Cloudflare cache can
+>   still be pre-6.5.6 HTML in which the divs are absent.
+> - `th` is `white-space: normal` (was `nowrap`): ten nowrap Georgian headers alone forced the live
+>   gcaa.ge table to ~2040px.
+> - Every `td` paints its own `background`, and striping/hover target `td` rather than `tr`. This is
+>   what keeps the sticky first column opaque; `background: inherit` on a `<td>` does **not** work.
+>   Conditional formatting writes inline styles, so it still wins.
+> - `.litestats-pagination:empty { display: none }` — otherwise a single-page table kept a floating
+>   `border-top` under itself.
+
 > ⚠ **GOTCHA — admin and frontend Chart.js configs drift.** Tooltip callbacks, scale config, and legend options are duplicated in both `admin-app.js` and `frontend-app.js`. If you add a tooltip feature, edit **both**. The pie-tooltip-title fix (v6.5.4) had to ship in both.
 
 ---
@@ -330,6 +373,11 @@ See `CLAUDE.md` for the user-facing rules. Key constraints:
 | Chart preview broken in admin but public render fine                | admin/frontend Chart.js configs drifted                     | `admin-app.js` vs `frontend-app.js`      |
 | Chart.js fails to load (browser blocks integrity)                   | SRI hash stale after CDN bump                               | `class-admin.php add_script_integrity()` |
 | `litestats-pro-edit` page asset missing                             | Tried to gate by hook prefix; hidden submenus use `admin_page_*` regardless of parent title — gate by `?page=` slug instead | `class-admin.php`                        |
+| Leading zeros vanish (`000001` saves as `1`)                          | `sanitize_config()` folded numeric strings with `$cell + 0`  | `class-data-handler.php sanitize_cell()`  |
+| A value like `4D` or `1,234` renders as `4` / `1`                    | `parseFloat()` in `formatValue()` truncates at the first non-numeric character | `frontend-app.js` + `grid-ui.js formatValue()` |
+| Editing a currency/date cell stores the formatted text as data       | Grid input showed the formatted value and wrote it back      | `grid-ui.js attachGridEvents()` (data-raw)|
+| Table is wider than the toolbar/pagination and spills past the card  | Table not inside `.litestats-table-scroll`                   | `class-shortcode.php` + `frontend-style.css` |
+| Sticky first column is see-through while scrolling                   | Background painted on `tr`, not `td`                         | `frontend-style.css .litestats-table td`  |
 | Table-view inside editor overlaps `.chart-controls`                 | `.chart-wrapper` has fixed `height: 320px`; #tablePreviewBox needs to scroll inside it | `assets/css/admin-style.css`             |
 | Save reload doesn't reload (browser bf-cache, same-URL no-op)       | `window.location.href = href` is unreliable                 | `admin-app.js` — use `replace()` + `_ts` |
 

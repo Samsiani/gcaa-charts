@@ -24,28 +24,76 @@
     };
 
     /**
+     * True when the column TYPE explicitly asks for numeric formatting.
+     *
+     * Deliberately does not consider props.precision: the admin precision
+     * <select> has no "none" option and pre-selects 0, so a precision gets
+     * attached to columns whose author never asked for number formatting —
+     * and that would silently switch the identifier guard below back off.
+     */
+    function hasExplicitFormat(col) {
+        return col.type === 'currency' || col.type === 'percentage' || col.type === 'formula';
+    }
+
+    /**
+     * Column precision as a number, or null when none is set.
+     *
+     * A precision of "0" is a real choice (no decimals); the old truthiness
+     * checks treated it as unset.
+     */
+    function columnPrecision(col) {
+        var p = col.props ? col.props.precision : null;
+        if (p === undefined || p === null || p === '') return null;
+        p = parseInt(p, 10);
+        return isNaN(p) ? null : p;
+    }
+
+    /**
      * Format a value based on column properties.
+     *
+     * Identifier-style text is rendered exactly as authored. A value is only
+     * treated as a number when the WHOLE string parses to a finite number and
+     * that number round-trips back to the same text, so "000001" stays "000001"
+     * (parseFloat would have made it 1) and "4D" stays "4D" (parseFloat: 4).
      */
     function formatValue(val, col) {
+        col = col || {};
+
+        var raw = (val === null || val === undefined) ? '' : String(val);
+
         if (col.type === 'string') {
-            return escapeHtml(val);
+            return escapeHtml(raw);
         }
 
         // Date type
         if (col.type === 'date') {
-            if (!val || val === '') return '';
+            // Test the original value: a stored 0 or false is "no date", not 1 Jan 2000.
+            if (!val) return '';
             try {
-                var d = new Date(val);
+                var d = new Date(raw);
                 if (!isNaN(d.getTime())) {
-                    return d.toLocaleDateString();
+                    return escapeHtml(d.toLocaleDateString());
                 }
             } catch(e) { /* fall through */ }
-            return escapeHtml(val);
+            return escapeHtml(raw);
         }
 
-        var num = parseFloat(val);
-        if (isNaN(num)) {
-            return escapeHtml(val);
+        var trimmed = raw.trim();
+        if (trimmed === '') return '';
+
+        var num = Number(trimmed);
+
+        // Not a clean, finite number ("1,234", "12abc", "4D", "28.02.2008\u10EC").
+        if (!isFinite(num)) {
+            return escapeHtml(raw);
+        }
+
+        var prefix = (col.props && col.props.prefix) ? col.props.prefix : '';
+        var suffixStr = (col.props && col.props.suffix) ? col.props.suffix : '';
+
+        // Text a number cannot round-trip: "000001", "007", "+5", "1e3", "01.50".
+        if (String(num) !== trimmed && !hasExplicitFormat(col)) {
+            return escapeHtml(prefix + raw + suffixStr);
         }
 
         // Percentage display for formula columns
@@ -55,40 +103,63 @@
 
         // Currency
         if (col.type === 'currency') {
-            var symbol = (col.props && col.props.currencySymbol) ? col.props.currencySymbol : ((col.props && col.props.prefix) ? col.props.prefix : '$');
-            var cp = (col.props && col.props.precision) ? parseInt(col.props.precision, 10) : 2;
-            return symbol + num.toLocaleString(undefined, { minimumFractionDigits: cp, maximumFractionDigits: cp });
+            var symbol = (col.props && col.props.currencySymbol) ? col.props.currencySymbol : (prefix || '$');
+            var cp = columnPrecision(col);
+            if (cp === null) cp = 2;
+            return escapeHtml(symbol + num.toLocaleString(undefined, { minimumFractionDigits: cp, maximumFractionDigits: cp }));
         }
 
         // Percentage type
         if (col.type === 'percentage') {
-            var pp = (col.props && col.props.precision) ? parseInt(col.props.precision, 10) : 1;
-            var suffix = (col.props && col.props.suffix) ? col.props.suffix : '%';
-            return num.toFixed(pp) + suffix;
+            var pp = columnPrecision(col);
+            if (pp === null) pp = 1;
+            var pSuffix = suffixStr || '%';
+            return escapeHtml(num.toFixed(pp) + pSuffix);
         }
 
-        var precision = (col.props && col.props.precision) ? col.props.precision : null;
+        var precision = columnPrecision(col);
+        var out;
         if (precision !== null) {
-            num = num.toFixed(precision);
+            out = num.toFixed(precision);
         } else if (col.type === 'formula' && num !== Math.floor(num)) {
-            num = num.toFixed(2);
+            out = num.toFixed(2);
+        } else {
+            out = String(num);
         }
-
-        var prefix = (col.props && col.props.prefix) ? col.props.prefix : '';
-        var suffixStr = (col.props && col.props.suffix) ? col.props.suffix : '';
 
         if (col.type === 'formula' && col.props && col.props.isPercent) {
             suffixStr = suffixStr + '%';
         }
 
-        return prefix + num + suffixStr;
+        return escapeHtml(prefix + out + suffixStr);
+    }
+
+    /**
+     * Escape for use in HTML text *and* in a double-quoted attribute.
+     *
+     * The old div.textContent round trip left quotes intact, so a value
+     * containing " broke out of the attributes it is written into
+     * (data-group="..." in the group sidebar, for one).
+     */
+    /**
+     * Localized UI string with a fallback.
+     */
+    function strings(key, fallback) {
+        if (typeof liteStatsProFrontend !== 'undefined' &&
+            liteStatsProFrontend.strings &&
+            liteStatsProFrontend.strings[key]) {
+            return liteStatsProFrontend.strings[key];
+        }
+        return fallback;
     }
 
     function escapeHtml(str) {
-        if (typeof str !== 'string') return str;
-        var div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+        return String(str === null || str === undefined ? '' : str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     /**
@@ -304,6 +375,65 @@
     }
 
     /**
+     * Put the table in its own horizontal scroll box and keep the scroll hints in sync.
+     *
+     * The shortcode emits this markup, but a page served from a full-page cache
+     * (LiteSpeed, Cloudflare) can still be older HTML in which the table is a direct
+     * child of the wrapper — so build the boxes here when they are missing, rather
+     * than letting the table spill outside the card again.
+     *
+     * @param {Element} tableWrapper The .litestats-table-wrapper element.
+     * @return {Function} Callback that refreshes the scroll-hint classes.
+     */
+    function setupTableScroll(tableWrapper) {
+        var noop = function() {};
+        var table = tableWrapper.querySelector('.litestats-table');
+        if (!table) return noop;
+
+        var scroll = tableWrapper.querySelector('.litestats-table-scroll');
+        var viewport = tableWrapper.querySelector('.litestats-table-viewport');
+
+        if (!scroll) {
+            viewport = document.createElement('div');
+            viewport.className = 'litestats-table-viewport';
+
+            scroll = document.createElement('div');
+            scroll.className = 'litestats-table-scroll';
+            scroll.setAttribute('tabindex', '0');
+            scroll.setAttribute('role', 'region');
+            // role="region" needs an accessible name, same as the PHP-emitted box.
+            scroll.setAttribute('aria-label', strings('tableData', 'Table data'));
+
+            table.parentNode.insertBefore(viewport, table);
+            viewport.appendChild(scroll);
+            scroll.appendChild(table);
+        }
+
+        if (!viewport) {
+            viewport = scroll.parentNode;
+        }
+        if (!viewport) return noop;
+
+        var update = function() {
+            var max = scroll.scrollWidth - scroll.clientWidth;
+            viewport.classList.toggle('litestats-more-left', scroll.scrollLeft > 1);
+            viewport.classList.toggle('litestats-more-right', max > 1 && scroll.scrollLeft < max - 1);
+        };
+
+        scroll.addEventListener('scroll', update, { passive: true });
+
+        if (window.ResizeObserver) {
+            var ro = new ResizeObserver(update);
+            ro.observe(scroll);
+            ro.observe(table);
+        } else {
+            window.addEventListener('resize', update);
+        }
+
+        return update;
+    }
+
+    /**
      * Render a table with pagination, filters, export, and responsive support.
      */
     function renderTable(containerId, chartData) {
@@ -320,6 +450,10 @@
         var condRules = settings.conditionalRules || [];
 
         var table = tableWrapper.querySelector('.litestats-table');
+        if (!table) return;
+
+        var syncScroll = setupTableScroll(tableWrapper);
+
         var thead = table.querySelector('thead');
         var tbody = table.querySelector('tbody');
         var paginationEl = tableWrapper.querySelector('.litestats-pagination');
@@ -374,20 +508,42 @@
             });
         }
 
+        /**
+         * Total ordering for one column.
+         *
+         * Values that do not parse (a stray "N/A" in a number column, an unparsable
+         * date) used to make the comparator return NaN, which leaves the sort order
+         * implementation-defined. They now sort after everything that does parse.
+         */
+        function compareBy(col, v1, v2) {
+            if (col.type === 'number' || col.type === 'currency' || col.type === 'percentage') {
+                var n1 = parseFloat(v1);
+                var n2 = parseFloat(v2);
+                var ok1 = !isNaN(n1);
+                var ok2 = !isNaN(n2);
+                if (ok1 && ok2) return n1 - n2;
+                if (ok1) return -1;
+                if (ok2) return 1;
+            } else if (col.type === 'date') {
+                var t1 = new Date(v1).getTime();
+                var t2 = new Date(v2).getTime();
+                var d1 = !isNaN(t1);
+                var d2 = !isNaN(t2);
+                if (d1 && d2) return t1 - t2;
+                if (d1) return -1;
+                if (d2) return 1;
+            }
+            return String(v1 === null || v1 === undefined ? '' : v1)
+                .localeCompare(String(v2 === null || v2 === undefined ? '' : v2));
+        }
+
         // Sort
         function applySort() {
             if (sortCol < 0) return;
+            var col = cols[sortCol];
+            if (!col) return;
             filteredRows.sort(function(a, b) {
-                var v1 = a[sortCol], v2 = b[sortCol];
-                var col = cols[sortCol];
-                var result;
-                if (col.type === 'number' || col.type === 'currency' || col.type === 'percentage') {
-                    result = parseFloat(v1) - parseFloat(v2);
-                } else if (col.type === 'date') {
-                    result = new Date(v1) - new Date(v2);
-                } else {
-                    result = String(v1).localeCompare(String(v2));
-                }
+                var result = compareBy(col, a[sortCol], b[sortCol]);
                 return sortAsc ? result : -result;
             });
         }
@@ -411,6 +567,9 @@
                 bHtml += '</tr>';
             });
             tbody.innerHTML = bHtml;
+
+            // Column widths change with the visible rows, so re-measure.
+            syncScroll();
         }
 
         // Conditional formatting
@@ -558,7 +717,9 @@
                         }).join(',') + '\n';
                     });
 
-                    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    // U+FEFF: without a BOM Excel reads the file as ANSI and the
+                    // Georgian headers and values open as mojibake.
+                    var blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
                     var url = URL.createObjectURL(blob);
                     var link = document.createElement('a');
                     link.href = url;
@@ -593,6 +754,11 @@
         renderPagination();
         bindSearch();
         bindExport();
+
+        // Fonts and late layout can change the table width after the first paint.
+        if (window.requestAnimationFrame) {
+            window.requestAnimationFrame(syncScroll);
+        }
     }
 
     /**

@@ -508,7 +508,17 @@
 .litestats-wrap .chart-wrapper #tablePreviewBox {
     position: absolute;
     inset: 0;
-    overflow-y: auto;
+    /* Both axes: a wide table used to spill out of the preview box sideways. */
+    overflow: auto;
+}
+
+.litestats-wrap .chart-wrapper #tablePreviewBox #feTable {
+    min-width: 100%;
+}
+
+.litestats-wrap .chart-wrapper #tablePreviewBox #feTable th {
+    white-space: normal;
+    min-width: 90px;
 }
 
 .litestats-wrap .chart-controls {

@@ -380,19 +380,45 @@ class DataHandler {
                 if ( ! is_array( $row ) ) {
                     continue;
                 }
-                $sanitized['rows'][] = array_map(
-                    function ( $cell ) {
-                        if ( is_numeric( $cell ) ) {
-                            return $cell + 0;
-                        }
-                        return sanitize_text_field( (string) $cell );
-                    },
-                    $row
-                );
+                $sanitized['rows'][] = array_map( [ $this, 'sanitize_cell' ], $row );
             }
         }
 
         return $sanitized;
+    }
+
+    /**
+     * Sanitize a single grid cell.
+     *
+     * A numeric-looking string is only folded into a real number when the round
+     * trip is lossless. Identifier-style values such as "000001", "007", "01.50",
+     * "+5", "1e3" or an integer wider than PHP can hold keep their original text,
+     * so certificate / registration numbers survive a save instead of collapsing
+     * to 1, 7, 1.5, 5 or 1000.
+     *
+     * @param mixed $cell Raw cell value decoded from the request JSON.
+     * @return mixed Number when losslessly numeric, sanitized string otherwise.
+     */
+    private function sanitize_cell( $cell ) {
+        // Values that arrived as real JSON numbers stay numbers.
+        if ( is_int( $cell ) || is_float( $cell ) ) {
+            return $cell;
+        }
+
+        if ( ! is_string( $cell ) ) {
+            return sanitize_text_field( (string) $cell );
+        }
+
+        $trimmed = trim( $cell );
+
+        if ( '' !== $trimmed && is_numeric( $trimmed ) ) {
+            $number = $trimmed + 0;
+            if ( (string) $number === $trimmed ) {
+                return $number;
+            }
+        }
+
+        return sanitize_text_field( $cell );
     }
 
     /**

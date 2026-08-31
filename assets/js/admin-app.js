@@ -84,8 +84,25 @@
                 };
             }
 
+            this.normalizeCols();
             this.migrateOldFormulas();
             this.syncSettingsUI();
+        },
+
+        /**
+         * Make every column carry a real props OBJECT.
+         *
+         * An empty PHP props array is encoded by wp_json_encode() as [], so it
+         * reaches JS as an Array. Assigning props.precision to an Array is not
+         * serialized by JSON.stringify, so Column Formatting (prefix / suffix /
+         * precision / isPercent) was silently discarded on the next save.
+         */
+        normalizeCols: function() {
+            (this.app.cols || []).forEach(function(col) {
+                if (!col.props || typeof col.props !== 'object' || Array.isArray(col.props)) {
+                    col.props = {};
+                }
+            });
         },
 
         migrateOldFormulas: function() {
@@ -509,7 +526,33 @@
         updateCell: function(rIdx, cIdx, val) {
             this.app.rows[rIdx][cIdx] = val;
             window.LiteStatsMathEngine.recalcAll(this.app);
+            this.refreshCalculatedCells();
             this.updateChartRender();
+        },
+
+        /**
+         * Repaint the read-only formula cells in place after a recalculation.
+         *
+         * A full renderGrid() would steal focus from the cell being edited, so
+         * only the calculated inputs are refreshed. Without this a formula column
+         * kept displaying its previous result until some other action re-rendered.
+         */
+        refreshCalculatedCells: function() {
+            var self = this;
+            var grid = window.LiteStatsGridUI;
+            if (!grid) return;
+
+            document.querySelectorAll('.cell-input.cell-calculated').forEach(function(el) {
+                var r = parseInt(el.dataset.rowIdx, 10);
+                var c = parseInt(el.dataset.colIdx, 10);
+                var row = self.app.rows[r];
+                var col = self.app.cols[c];
+                if (!row || !col) return;
+
+                var raw = row[c];
+                el.dataset.raw = (raw === null || raw === undefined) ? '' : String(raw);
+                el.value = grid.formatValue(raw, col);
+            });
         },
 
         updateHeader: function(cIdx, val) {
@@ -526,13 +569,26 @@
             this.saveState();
             col.type = newType;
 
-            // Reset props for new type
+            if (!col.props || Array.isArray(col.props)) {
+                col.props = {};
+            }
+
+            // Reset props for new type. The formatting props belong to the type
+            // that added them — leaving a currency column's prefix behind made a
+            // plain number column render "$1.00".
             if (newType === 'currency') {
+                delete col.props.suffix;
                 col.props.prefix = col.props.prefix || '$';
                 col.props.precision = col.props.precision || '2';
             } else if (newType === 'percentage') {
+                delete col.props.prefix;
                 col.props.suffix = col.props.suffix || '%';
                 col.props.precision = col.props.precision || '1';
+            } else {
+                delete col.props.prefix;
+                delete col.props.suffix;
+                delete col.props.precision;
+                delete col.props.currencySymbol;
             }
 
             this.renderGrid();
@@ -884,6 +940,22 @@
             });
         },
 
+        /**
+         * Escape for HTML text and double-quoted attributes.
+         * Delegates to the grid module so both use one implementation.
+         */
+        escapeHtml: function(str) {
+            if (window.LiteStatsGridUI) {
+                return window.LiteStatsGridUI.escapeHtml(str);
+            }
+            return String(str === null || str === undefined ? '' : str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        },
+
         renderFrontendTable: function() {
             var self = this;
             var thead = $('#feThead');
@@ -891,7 +963,7 @@
 
             var hHtml = '<tr>';
             this.app.cols.forEach(function(c, i) {
-                hHtml += '<th data-sort-idx="' + i + '">' + c.name + ' <i class="fas fa-sort" style="font-size:10px; color:#ccc"></i></th>';
+                hHtml += '<th data-sort-idx="' + i + '">' + self.escapeHtml(c.name) + ' <i class="fas fa-sort" style="font-size:10px; color:#ccc"></i></th>';
             });
             thead.html(hHtml + '</tr>');
 
@@ -907,7 +979,7 @@
                     if (CF && condRules.length) {
                         cellStyle = CF.getCellStyle(cell, i, condRules);
                     }
-                    bHtml += '<td' + (cellStyle ? ' style="' + cellStyle + '"' : '') + '>' + formatted + '</td>';
+                    bHtml += '<td' + (cellStyle ? ' style="' + cellStyle + '"' : '') + '>' + self.escapeHtml(formatted) + '</td>';
                 });
                 bHtml += '</tr>';
             });
@@ -929,12 +1001,24 @@
 
         sortTable: function(n) {
             var self = this;
+            var type = this.app.cols[n] ? this.app.cols[n].type : 'string';
+            var isNumeric = type === 'number' || type === 'currency' || type === 'percentage';
+
             this.app.rows.sort(function(a, b) {
                 var v1 = a[n], v2 = b[n];
-                if (self.app.cols[n].type === 'number' || self.app.cols[n].type === 'currency' || self.app.cols[n].type === 'percentage') {
-                    return parseFloat(v1) - parseFloat(v2);
+                if (isNumeric) {
+                    // A total ordering: unparsable values sort last instead of
+                    // making the comparator return NaN.
+                    var n1 = parseFloat(v1);
+                    var n2 = parseFloat(v2);
+                    var ok1 = !isNaN(n1);
+                    var ok2 = !isNaN(n2);
+                    if (ok1 && ok2) return n1 - n2;
+                    if (ok1) return -1;
+                    if (ok2) return 1;
                 }
-                return v1.toString().localeCompare(v2);
+                return String(v1 === null || v1 === undefined ? '' : v1)
+                    .localeCompare(String(v2 === null || v2 === undefined ? '' : v2));
             });
             this.renderFrontendTable();
         },

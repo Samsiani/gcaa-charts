@@ -195,6 +195,7 @@ class Shortcode {
             <div class="litestats-content-area" <?php echo ! $has_group && 'table' !== $settings['view'] ? 'style="height:' . $height . '"' : ''; ?>>
                 <?php if ( 'table' === $settings['view'] ) : ?>
                     <div class="litestats-table-wrapper">
+                        <?php if ( $settings['tableShowSearch'] || $settings['tableShowExport'] ) : ?>
                         <div class="litestats-table-toolbar">
                             <?php if ( $settings['tableShowSearch'] ) : ?>
                                 <div class="litestats-search-wrapper">
@@ -216,10 +217,15 @@ class Shortcode {
                                 </div>
                             <?php endif; ?>
                         </div>
-                        <table class="litestats-table<?php echo $settings['tableStriped'] ? ' litestats-striped' : ''; ?>">
-                            <thead></thead>
-                            <tbody></tbody>
-                        </table>
+                        <?php endif; ?>
+                        <div class="litestats-table-viewport">
+                            <div class="litestats-table-scroll" tabindex="0" role="region" aria-label="<?php esc_attr_e( 'Table data', 'litestats-pro' ); ?>">
+                                <table class="litestats-table<?php echo $settings['tableStriped'] ? ' litestats-striped' : ''; ?>">
+                                    <thead></thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
                         <div class="litestats-pagination"></div>
                     </div>
                 <?php else : ?>
@@ -269,6 +275,7 @@ class Shortcode {
                 'ajaxUrl' => admin_url( 'admin-ajax.php' ),
                 'strings' => [
                     'noData'    => __( 'No data available', 'litestats-pro' ),
+                    'tableData' => __( 'Table data', 'litestats-pro' ),
                     'page'      => __( 'Page', 'litestats-pro' ),
                     'of'        => __( 'of', 'litestats-pro' ),
                     'prev'      => __( 'Previous', 'litestats-pro' ),

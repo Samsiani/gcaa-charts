@@ -271,9 +271,11 @@
                 if (/^[\d.,]+\s*%$/.test(s)) {
                     percentCount++;
                 }
-                // Number
+                // Number. Text with a leading zero ("000001", "007") is an
+                // identifier, not a quantity — leave those columns as strings so
+                // the zeros survive the import.
                 var cleaned = s.replace(/[$,\u20AC\u00A3%\s]/g, '');
-                if (!isNaN(parseFloat(cleaned)) && isFinite(cleaned)) {
+                if (!/^[+-]?0\d/.test(cleaned) && !isNaN(parseFloat(cleaned)) && isFinite(cleaned)) {
                     numCount++;
                 }
             });
@@ -463,14 +465,11 @@
 
                     // Coerce values
                     if (colType === 'number') {
-                        var cleaned = val.replace(/[,\s]/g, '');
-                        row.push(isNaN(parseFloat(cleaned)) ? 0 : parseFloat(cleaned));
+                        row.push(this.toNumberOrText(val, /[,\s]/g));
                     } else if (colType === 'currency') {
-                        var cleaned2 = val.replace(/[$\u20AC\u00A3,\s]/g, '');
-                        row.push(isNaN(parseFloat(cleaned2)) ? 0 : parseFloat(cleaned2));
+                        row.push(this.toNumberOrText(val, /[$\u20AC\u00A3,\s]/g));
                     } else if (colType === 'percentage') {
-                        var cleaned3 = val.replace(/[%,\s]/g, '');
-                        row.push(isNaN(parseFloat(cleaned3)) ? 0 : parseFloat(cleaned3));
+                        row.push(this.toNumberOrText(val, /[%,\s]/g));
                     } else {
                         row.push(val);
                     }
@@ -481,11 +480,40 @@
             this.callback({ cols: cols, rows: rows });
         },
 
+        /**
+         * Convert an imported cell to a number, but only when nothing is lost.
+         *
+         * "000001" is an identifier and "N/A" is not a number at all; the old
+         * parseFloat()-with-0-fallback turned them into 1 and 0. Both now keep
+         * their original text.
+         *
+         * @param {*}      val     Raw cell text from the CSV.
+         * @param {RegExp} stripRe Formatting characters to ignore.
+         * @return {number|string} Number when the round trip is lossless, text otherwise.
+         */
+        toNumberOrText: function(val, stripRe) {
+            var raw = String(val === null || val === undefined ? '' : val).trim();
+            var cleaned = raw.replace(stripRe, '');
+            if (cleaned === '') return raw;
+
+            var n = Number(cleaned);
+
+            // Not a number at all ("N/A", "-") — keep the text rather than the old 0.
+            if (!isFinite(n)) return raw;
+
+            // A leading zero marks an identifier ("000001", "007"), not a quantity.
+            if (/^[+-]?0\d/.test(cleaned)) return raw;
+
+            return n;
+        },
+
         escapeHtml: function(str) {
-            if (typeof str !== 'string') return str;
-            var div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
+            return String(str === null || str === undefined ? '' : str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
         }
     };
 
